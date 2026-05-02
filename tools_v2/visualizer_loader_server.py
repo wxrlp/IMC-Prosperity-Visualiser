@@ -394,6 +394,7 @@ def main() -> None:
 
     repo_root = Path(args.repo_root).resolve()
     httpd = ThreadingHTTPServer((args.host, args.port), make_handler(repo_root))
+    httpd.allow_reuse_address = True
     print(f"Serving: http://{args.host}:{args.port}/visualizer.html")
     print("Load API: GET|POST /api/load-data")
     print("Remove API: POST /api/remove-runs")

@@ -10,7 +10,20 @@ window.BACKTEST_DATA = [
         final_pnl: 12450.5,
         max_dd: 450.0,
         sharpe: 2.1,
-        history: Array.from({length: 100}, (_, i) => ({ pnl: 12450.5 * (i/100) + Math.random() * 500, products: { "OSMIUM": 8000 * (i/100), "PEPPER": 4450.5 * (i/100) } }))
+        final_pnl_by_product: { "VELVETFRUIT_EXTRACT": 8000, "HYDROGEL_PACK": 4450.5 },
+        history: Array.from({length: 100}, (_, i) => ({ pnl: 12450.5 * (i/100) + Math.random() * 500, products: { "VELVETFRUIT_EXTRACT": 8000 * (i/100), "HYDROGEL_PACK": 4450.5 * (i/100) } }))
+    },
+    {
+        id: "bt_adin_v2_r5_d2",
+        trader: "Adin_V2",
+        round: "R5",
+        day: "D2",
+        status: "ACCEPTED",
+        final_pnl: 10200.0,
+        max_dd: 800.0,
+        sharpe: 1.6,
+        final_pnl_by_product: { "VELVETFRUIT_EXTRACT": 6000, "HYDROGEL_PACK": 4200 },
+        history: Array.from({length: 100}, (_, i) => ({ pnl: 10200 * (i/100) + Math.random() * 400, products: { "VELVETFRUIT_EXTRACT": 6000 * (i/100), "HYDROGEL_PACK": 4200 * (i/100) } }))
     },
     {
         id: "bt_phi_r5_d2",
@@ -21,7 +34,8 @@ window.BACKTEST_DATA = [
         final_pnl: -2300.0,
         max_dd: 3100.0,
         sharpe: -0.4,
-        history: Array.from({length: 100}, (_, i) => ({ pnl: -2300 * (i/100) + Math.random() * 200, products: { "OSMIUM": -1000 * (i/100), "PEPPER": -1300 * (i/100) } }))
+        final_pnl_by_product: { "VELVETFRUIT_EXTRACT": -1000, "HYDROGEL_PACK": -1300 },
+        history: Array.from({length: 100}, (_, i) => ({ pnl: -2300 * (i/100) + Math.random() * 200, products: { "VELVETFRUIT_EXTRACT": -1000 * (i/100), "HYDROGEL_PACK": -1300 * (i/100) } }))
     }
 ];
 
