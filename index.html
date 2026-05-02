@@ -41,7 +41,7 @@
         const { useState, useEffect, useMemo, useRef } = React;
         const Chart = window.ReactApexCharts.default;
 
-        // --- LTTB Downsampling Algorithm ---
+        // --- LTTB Downsampling Algorithm (Line-shortened for compatibility) ---
         function lttb(data, threshold) {
             const dataLength = data.length;
             if (threshold >= dataLength || threshold === 0) return data;
@@ -52,19 +52,31 @@
             let maxAreaPoint, maxArea, area, nextA;
             sampled[sampledIndex++] = data[a];
             for (let i = 0; i < threshold - 2; i++) {
-                let avgX = 0, avgY = 0, avgRangeStart = Math.floor((i + 1) * every) + 1, avgRangeEnd = Math.floor((i + 2) * every) + 1;
+                let avgX = 0, avgY = 0;
+                let avgRangeStart = Math.floor((i + 1) * every) + 1;
+                let avgRangeEnd = Math.floor((i + 2) * every) + 1;
                 avgRangeEnd = avgRangeEnd < dataLength ? avgRangeEnd : dataLength;
                 const avgRangeLength = avgRangeEnd - avgRangeStart;
                 for (; avgRangeStart < avgRangeEnd; avgRangeStart++) {
-                    avgX += avgRangeStart; avgY += data[avgRangeStart].y;
+                    avgX += avgRangeStart; 
+                    avgY += data[avgRangeStart].y;
                 }
-                avgX /= avgRangeLength; avgY /= avgRangeLength;
-                let rangeOffs = Math.floor(i * every) + 1, rangeTo = Math.floor((i + 1) * every) + 1;
-                const pointAX = a, pointAY = data[a].y;
+                avgX /= avgRangeLength; 
+                avgY /= avgRangeLength;
+                let rangeOffs = Math.floor(i * every) + 1;
+                let rangeTo = Math.floor((i + 1) * every) + 1;
+                const pointAX = a;
+                const pointAY = data[a].y;
                 maxArea = area = -1;
                 for (; rangeOffs < rangeTo; rangeOffs++) {
-                    area = Math.abs((pointAX - avgX) * (data[rangeOffs].y - pointAY) - (pointAX - rangeOffs) * (avgY - pointAY)) * 0.5;
-                    if (area > maxArea) { maxArea = area; maxAreaPoint = data[rangeOffs]; nextA = rangeOffs; }
+                    const dY = data[rangeOffs].y;
+                    area = Math.abs((pointAX - avgX) * (dY - pointAY) - 
+                           (pointAX - rangeOffs) * (avgY - pointAY)) * 0.5;
+                    if (area > maxArea) { 
+                        maxArea = area; 
+                        maxAreaPoint = data[rangeOffs]; 
+                        nextA = rangeOffs; 
+                    }
                 }
                 sampled[sampledIndex++] = maxAreaPoint;
                 a = nextA;
@@ -76,14 +88,17 @@
         // --- UI Components ---
         const Icon = ({ name, size = 18, className = "" }) => {
             useEffect(() => { window.lucide && window.lucide.createIcons(); }, [name]);
-            const iconStyle = { width: size, height: size }; // Avoid {{ }} for Jekyll compatibility
+            const iconStyle = { width: size, height: size };
             return <i data-lucide={name} style={iconStyle} className={className}></i>;
         };
 
         const PressureGauge = ({ label, value, limit = 80 }) => {
             const percent = Math.min(Math.abs(value) / limit * 100, 100);
-            const colorClass = percent > 90 ? 'bg-rose-500' : percent > 70 ? 'bg-amber-500' : 'bg-[#00ff9d]';
-            const shadowClass = percent > 90 ? 'shadow-[0_0_10px_#ef4444]' : percent > 70 ? 'shadow-[0_0_10px_#f59e0b]' : 'shadow-[0_0_10px_#00ff9d]';
+            const colorClass = percent > 90 ? 'bg-rose-500' : 
+                               percent > 70 ? 'bg-amber-500' : 'bg-[#00ff9d]';
+            const shadowClass = percent > 90 ? 'shadow-[0_0_10px_#ef4444]' : 
+                                percent > 70 ? 'shadow-[0_0_10px_#f59e0b]' : 
+                                'shadow-[0_0_10px_#00ff9d]';
             const barStyle = { width: percent + '%' };
             return (
                 <div className="flex flex-col gap-2">
@@ -92,7 +107,8 @@
                         <span className="mono">{value} / {limit}</span>
                     </div>
                     <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                        <div className={`h-full ${colorClass} ${shadowClass} transition-all duration-300`} style={barStyle}></div>
+                        <div className={`h-full ${colorClass} ${shadowClass} transition-all duration-300`} 
+                             style={barStyle}></div>
                     </div>
                 </div>
             );
@@ -115,7 +131,8 @@
             const selected = data.find(d => d.id === selectedId) || data[0];
             if (!selected) return <div className="p-20 text-center text-zinc-600 italic">No records found.</div>;
 
-            const currentPoint = selected.history[Math.min(currentTime, selected.history.length - 1)] || { pnl: 0, products: {} };
+            const currentPoint = selected.history[Math.min(currentTime, selected.history.length - 1)] || 
+                                 { pnl: 0, products: {} };
 
             const chartOptions = {
                 chart: { type: 'area', background: 'transparent', toolbar: { show: false }, animations: { enabled: false } },
@@ -127,7 +144,8 @@
                 yaxis: { labels: { style: { colors: '#545d6a' }, formatter: (v) => v.toLocaleString() } },
                 tooltip: { theme: 'dark' },
                 annotations: {
-                    xaxis: [{ x: currentTime, borderColor: '#00ff9d', label: { style: { color: '#000', background: '#00ff9d', fontWeight: '900' }, text: 'T' + currentTime } }]
+                    xaxis: [{ x: currentTime, borderColor: '#00ff9d', 
+                    label: { style: { color: '#000', background: '#00ff9d', fontWeight: '900' }, text: 'T' + currentTime } }]
                 }
             };
 
@@ -137,12 +155,24 @@
                 <div className="grid grid-cols-12 gap-8 h-full">
                     <div className="col-span-8 flex flex-col gap-8">
                         <div className="grid grid-cols-3 gap-6">
-                            <Card title="PnL Snapshot"><div className="text-4xl font-black mono accent-glow text-[#00ff9d]">{currentPoint.pnl.toLocaleString()}</div></Card>
-                            <Card title="Max Drawdown"><div className="text-4xl font-black mono text-rose-500">{selected.max_dd?.toLocaleString() || 0}</div></Card>
-                            <Card title="Sharpe"><div className="text-4xl font-black mono">{selected.sharpe || 0}</div></Card>
+                            <Card title="PnL Snapshot">
+                                <div className="text-4xl font-black mono accent-glow text-[#00ff9d]">
+                                    {currentPoint.pnl.toLocaleString()}
+                                </div>
+                            </Card>
+                            <Card title="Max Drawdown">
+                                <div className="text-4xl font-black mono text-rose-500">
+                                    {selected.max_dd?.toLocaleString() || 0}
+                                </div>
+                            </Card>
+                            <Card title="Sharpe">
+                                <div className="text-4xl font-black mono">{selected.sharpe || 0}</div>
+                            </Card>
                         </div>
                         <Card title="Equity Trajectory" className="flex-1">
-                            <div className="h-full"><Chart options={chartOptions} series={[{name: 'PnL', data: downsampledData}]} type="area" height="100%" /></div>
+                            <div className="h-full">
+                                <Chart options={chartOptions} series={[{name: 'PnL', data: downsampledData}]} type="area" height="100%" />
+                            </div>
                         </Card>
                     </div>
                     <div className="col-span-4 flex flex-col gap-8">
@@ -158,12 +188,15 @@
                                 <table className="w-full text-left">
                                     <tbody className="text-xs">
                                         {data.map(t => (
-                                            <tr key={t.id} onClick={() => onSelect(t.id)} className={`border-b border-zinc-900 hover:bg-white/5 cursor-pointer ${selectedId === t.id ? 'bg-[#00ff9d]/10' : ''}`}>
+                                            <tr key={t.id} onClick={() => onSelect(t.id)} 
+                                                className={`border-b border-zinc-900 hover:bg-white/5 cursor-pointer ${selectedId === t.id ? 'bg-[#00ff9d]/10' : ''}`}>
                                                 <td className="py-5 px-2">
                                                     <div className="font-black uppercase tracking-widest text-zinc-200">{t.trader}</div>
                                                     <div className="text-[10px] text-zinc-600 font-bold">{t.round} {t.day}</div>
                                                 </td>
-                                                <td className="py-5 px-2 mono font-black text-right text-[#00ff9d]">{t.final_pnl.toLocaleString()}</td>
+                                                <td className="py-5 px-2 mono font-black text-right text-[#00ff9d]">
+                                                    {t.final_pnl.toLocaleString()}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -204,12 +237,14 @@
                 <div className="space-y-8 h-full flex flex-col">
                     <div className="grid grid-cols-2 gap-8">
                         <Card title="Select Baseline">
-                            <select value={baselineId} onChange={e => setBaselineId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm font-bold text-zinc-300 outline-none">
+                            <select value={baselineId} onChange={e => setBaselineId(e.target.value)} 
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm font-bold text-zinc-300 outline-none">
                                 {data.map(d => <option key={d.id} value={d.id}>{d.trader} ({d.round} {d.day})</option>)}
                             </select>
                         </Card>
                         <Card title="Select Candidate">
-                            <select value={candidateId} onChange={e => setCandidateId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm font-bold text-zinc-300 outline-none">
+                            <select value={candidateId} onChange={e => setCandidateId(e.target.value)} 
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm font-bold text-zinc-300 outline-none">
                                 {data.map(d => <option key={d.id} value={d.id}>{d.trader} ({d.round} {d.day})</option>)}
                             </select>
                         </Card>
@@ -240,7 +275,9 @@
             return (
                 <div className="grid grid-cols-2 gap-8 h-full">
                     <Card title="Product Attribution" subtitle="PnL breakdown by asset.">
-                        <div className="h-[400px]"><Chart options={chartOptions} series={[{name: 'PnL', data: values}]} type="bar" height="100%" /></div>
+                        <div className="h-[400px]">
+                            <Chart options={chartOptions} series={[{name: 'PnL', data: values}]} type="bar" height="100%" />
+                        </div>
                     </Card>
                     <Card title="Efficiency Metrics">
                         <div className="space-y-8 mt-10">
@@ -248,7 +285,9 @@
                                 <div key={p} className="flex justify-between items-center border-b border-zinc-900 pb-4">
                                     <div>
                                         <div className="text-xs font-black uppercase tracking-widest text-zinc-200">{p}</div>
-                                        <div className="text-[10px] text-zinc-600 font-bold">Contribution: {((pnlData[p] / selectedData.final_pnl) * 100).toFixed(1)}%</div>
+                                        <div className="text-[10px] text-zinc-600 font-bold">
+                                            Contribution: {((pnlData[p] / selectedData.final_pnl) * 100).toFixed(1)}%
+                                        </div>
                                     </div>
                                     <div className={`mono font-black ${pnlData[p] >= 0 ? 'text-[#00ff9d]' : 'text-rose-500'}`}>
                                         {pnlData[p] >= 0 ? '+' : ''}{pnlData[p].toLocaleString()}
@@ -311,6 +350,10 @@
                 }
             };
 
+            const isLocal = window.location.hostname === 'localhost' || 
+                            window.location.hostname === '127.0.0.1' ||
+                            window.location.protocol === 'file:';
+
             return (
                 <div className="flex h-full">
                     {/* Sidebar */}
@@ -320,7 +363,9 @@
                                 <div className="w-12 h-12 bg-[#00ff9d] rounded-[1rem] flex items-center justify-center shadow-[0_0_30px_rgba(0,255,157,0.4)]">
                                     <Icon name="terminal" className="text-black" size={26} />
                                 </div>
-                                <h1 className="text-2xl font-black tracking-tighter uppercase italic">Prosperity<span className="text-[#00ff9d]">X</span></h1>
+                                <h1 className="text-2xl font-black tracking-tighter uppercase italic">
+                                    Prosperity<span className="text-[#00ff9d]">X</span>
+                                </h1>
                             </div>
                         </div>
 
@@ -329,7 +374,8 @@
                                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-4 block">Source Node</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {['BACKTEST', 'LIVE', 'I4BT', 'REAL', 'SCENARIO', 'STRESS'].map(s => (
-                                        <button key={s} onClick={() => setFilters({...filters, source: s})} className={`py-3 px-3 rounded-2xl text-[10px] font-black border transition-all ${filters.source === s ? 'bg-[#00ff9d] border-[#00ff9d] text-black shadow-[0_0_15px_rgba(0,255,157,0.3)]' : 'border-zinc-800 text-zinc-600 hover:border-zinc-700'}`}>{s}</button>
+                                        <button key={s} onClick={() => setFilters({...filters, source: s})} 
+                                                className={`py-3 px-3 rounded-2xl text-[10px] font-black border transition-all ${filters.source === s ? 'bg-[#00ff9d] border-[#00ff9d] text-black shadow-[0_0_15px_rgba(0,255,157,0.3)]' : 'border-zinc-800 text-zinc-600 hover:border-zinc-700'}`}>{s}</button>
                                     ))}
                                 </div>
                             </section>
@@ -341,7 +387,9 @@
                                         <span>Tick T</span>
                                         <span className="text-[#00ff9d]">{currentTime}</span>
                                     </div>
-                                    <input type="range" min="0" max="99" value={currentTime} onChange={(e) => setCurrentTime(parseInt(e.target.value))} className="w-full h-1 bg-white/5 rounded-full appearance-none cursor-pointer slider-thumb" />
+                                    <input type="range" min="0" max="99" value={currentTime} 
+                                           onChange={(e) => setCurrentTime(parseInt(e.target.value))} 
+                                           className="w-full h-1 bg-white/5 rounded-full appearance-none cursor-pointer slider-thumb" />
                                     <div className="flex gap-2">
                                         <button onClick={() => setIsPlaying(!isPlaying)} className="flex-1 py-3 bg-white/5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-all">
                                             <Icon name={isPlaying ? 'pause' : 'play'} size={14} className={isPlaying ? 'text-[#00ff9d]' : ''} />
@@ -355,8 +403,10 @@
                         </div>
 
                         <div className="mt-auto">
-                            <button onClick={handleRefetch} disabled={isRefetching} className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-500 text-black rounded-2xl text-xs font-black shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:scale-[1.02] transition-all disabled:opacity-50">
-                                <Icon name="refresh-cw" size={16} className={isRefetching ? 'animate-spin' : ''} /> {isRefetching ? 'REFETCHING...' : 'REFETCH CLOUD DATA'}
+                            <button onClick={handleRefetch} disabled={isRefetching} 
+                                    className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-500 text-black rounded-2xl text-xs font-black shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:scale-[1.02] transition-all disabled:opacity-50">
+                                <Icon name="refresh-cw" size={16} className={isRefetching ? 'animate-spin' : ''} /> 
+                                {isRefetching ? 'REFETCHING...' : 'REFETCH CLOUD DATA'}
                             </button>
                         </div>
                     </div>
@@ -366,7 +416,8 @@
                         <header className="h-24 border-b border-zinc-900/50 flex items-center justify-between px-12 glass">
                             <nav className="flex gap-12 h-full">
                                 {['OVERLAY', 'COMPARE', 'ATTRIBUTION', 'STABILITY', 'STRESS LAB'].map(tab => (
-                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`text-[11px] font-black uppercase tracking-[0.4em] relative h-full transition-all ${activeTab === tab ? 'text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
+                                    <button key={tab} onClick={() => setActiveTab(tab)} 
+                                            className={`text-[11px] font-black uppercase tracking-[0.4em] relative h-full transition-all ${activeTab === tab ? 'text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
                                         {tab}
                                         {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#00ff9d] shadow-[0_0_20px_rgba(0,255,157,0.6)]" />}
                                     </button>
@@ -375,12 +426,12 @@
                             <div className="flex items-center gap-6">
                                 <div className="flex flex-col items-end">
                                     <span className="text-[10px] font-black text-[#00ff9d] accent-glow tracking-widest uppercase">
-                                        {isRefetching ? 'UPDATING...' : (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'Local Node' : 'Standalone Mode')}
+                                        {isRefetching ? 'UPDATING...' : (isLocal ? 'Local Node' : 'Standalone Mode')}
                                     </span>
-                                    <span className="text-xs font-bold text-zinc-600">v3.4.2 STABLE</span>
+                                    <span className="text-xs font-bold text-zinc-600">v3.4.3 STABLE</span>
                                 </div>
-                                <div className={`w-10 h-10 rounded-xl ${window.location.protocol === 'http:' ? 'bg-[#00ff9d]/10 border-[#00ff9d]/30' : 'bg-zinc-800 border-zinc-700'} border flex items-center justify-center`}>
-                                    <div className={`w-2.5 h-2.5 rounded-full ${window.location.protocol === 'http:' ? 'bg-[#00ff9d] animate-pulse shadow-[0_0_10px_#00ff9d]' : 'bg-zinc-500'} `} />
+                                <div className={`w-10 h-10 rounded-xl ${isLocal ? 'bg-[#00ff9d]/10 border-[#00ff9d]/30' : 'bg-zinc-800 border-zinc-700'} border flex items-center justify-center`}>
+                                    <div className={`w-2.5 h-2.5 rounded-full ${isLocal ? 'bg-[#00ff9d] animate-pulse shadow-[0_0_10px_#00ff9d]' : 'bg-zinc-500'} `} />
                                 </div>
                             </div>
                         </header>

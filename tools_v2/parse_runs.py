@@ -96,7 +96,7 @@ for folder in log_folders:
 
 output_path = REPO_ROOT / "backtest_comparison.js"
 with open(output_path, "w", encoding="utf-8") as f:
-    f.write("const BACKTEST_DATA = " + json.dumps(backtest_data) + ";\n")
+    f.write("const BACKTEST_DATA = " + json.dumps(backtest_data, indent=2) + ";\n")
 
 rounds = sorted(set(v["round"] for v in backtest_data.values()))
 days = sorted(set(v["day"] for v in backtest_data.values()))
