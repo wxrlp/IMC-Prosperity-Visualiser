@@ -12,63 +12,43 @@
     <script src="https://cdn.jsdelivr.net/npm/react-apexcharts@1.4.1/dist/react-apexcharts.iife.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0a0a0c;
-            color: #e4e4e7;
-        }
-        .mono {
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .glass {
-            background: rgba(18, 18, 23, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .sidebar-item-active {
-            background: rgba(59, 130, 246, 0.1);
-            border-right: 2px solid #3b82f6;
-            color: #3b82f6;
-        }
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0a0a0c;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #27272a;
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #3f3f46;
-        }
-        .apexcharts-tooltip {
-            background: #18181b !important;
-            border: 1px solid #3f3f46 !important;
-            color: #e4e4e7 !important;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #0a0a0c; color: #e4e4e7; margin: 0; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(18, 18, 23, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0a0a0c; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
     </style>
 </head>
 <body class="h-screen overflow-hidden">
     <div id="root" class="h-full"></div>
 
+    <script src="sample_data.js"></script>
+    <!-- Fallback for actual comparison files -->
+    <script src="backtest_comparison.js" onerror="console.log('backtest_comparison.js not found')"></script>
+    <script src="i4bt_comparison.js" onerror="console.log('i4bt_comparison.js not found')"></script>
+    <script src="live_comparison.js" onerror="console.log('live_comparison.js not found')"></script>
+
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
+
+        // Alias for the chart component
+        const Chart = window.ReactApexCharts.default;
 
         // --- UI Components ---
         const Icon = ({ name, className = "" }) => {
             useEffect(() => {
-                lucide.createIcons();
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
             }, [name]);
             return <i data-lucide={name} className={className}></i>;
         };
 
         const Card = ({ children, title, className = "" }) => (
             <div className={`glass rounded-xl p-5 ${className}`}>
-                {title && <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-4">{title}</h3>}
+                {title && <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-4">{title}</h3>}
                 {children}
             </div>
         );
@@ -94,13 +74,31 @@
             const [selectedRound, setSelectedRound] = useState('R5');
             const [selectedDay, setSelectedDay] = useState('TOTAL');
             const [selectedSources, setSelectedSources] = useState(['BACKTEST']);
+            const [selectedTraderId, setSelectedTraderId] = useState(null);
             
-            // Placeholder for data
-            const [data, setData] = useState({
-                backtest: [],
-                live: [],
-                i4bt: []
-            });
+            const rawData = useMemo(() => ({
+                backtest: window.BACKTEST_DATA || [],
+                i4bt: window.I4BT_DATA || [],
+                live: window.LIVE_LOG_DATA || []
+            }), []);
+
+            const filteredData = useMemo(() => {
+                const result = { backtest: [], i4bt: [], live: [] };
+                selectedSources.forEach(src => {
+                    const srcKey = src.toLowerCase();
+                    result[srcKey] = (rawData[srcKey] || []).filter(d => 
+                        (selectedRound === 'TOTAL' || d.round === selectedRound) &&
+                        (selectedDay === 'TOTAL' || d.day === selectedDay)
+                    );
+                });
+                return result;
+            }, [selectedSources, selectedRound, selectedDay, rawData]);
+
+            useEffect(() => {
+                if (!selectedTraderId && filteredData.backtest.length > 0) {
+                    setSelectedTraderId(filteredData.backtest[0].id);
+                }
+            }, [filteredData]);
 
             return (
                 <div className="flex h-full w-full">
@@ -116,26 +114,17 @@
                         </div>
 
                         <div className="flex-1 overflow-y-auto py-6 space-y-8">
-                            {/* Source Filter */}
                             <div className="px-6 space-y-3">
                                 <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Sources</h2>
                                 <div className="space-y-1">
                                     {['BACKTEST', 'I4BT', 'LIVE'].map(src => (
                                         <button 
                                             key={src}
-                                            onClick={() => {
-                                                setSelectedSources(prev => 
-                                                    prev.includes(src) ? prev.filter(s => s !== src) : [...prev, src]
-                                                )
-                                            }}
-                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all ${
-                                                selectedSources.includes(src) ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
-                                            }`}
+                                            onClick={() => setSelectedSources(prev => prev.includes(src) ? prev.filter(s => s !== src) : [...prev, src])}
+                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all ${selectedSources.includes(src) ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                                         >
                                             <span className="flex items-center gap-2">
-                                                <div className={`w-1.5 h-1.5 rounded-full ${
-                                                    src === 'BACKTEST' ? 'bg-blue-500' : src === 'I4BT' ? 'bg-emerald-500' : 'bg-rose-500'
-                                                }`} />
+                                                <div className={`w-1.5 h-1.5 rounded-full ${src === 'BACKTEST' ? 'bg-blue-500' : src === 'I4BT' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                                                 {src}
                                             </span>
                                             {selectedSources.includes(src) && <Icon name="check" className="w-3 h-3" />}
@@ -144,227 +133,164 @@
                                 </div>
                             </div>
 
-                            {/* Round Filter */}
                             <div className="px-6 space-y-3">
                                 <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Rounds</h2>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {['R3', 'R4', 'R5'].map(r => (
-                                        <button 
-                                            key={r}
-                                            onClick={() => setSelectedRound(r)}
-                                            className={`py-2 rounded-lg text-xs font-bold transition-all border ${
-                                                selectedRound === r ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'
-                                            }`}
-                                        >
-                                            {r}
-                                        </button>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {['TOTAL', 'R3', 'R4', 'R5'].map(r => (
+                                        <button key={r} onClick={() => setSelectedRound(r)} className={`py-2 rounded-lg text-[10px] font-bold transition-all border ${selectedRound === r ? 'bg-blue-600 border-blue-500 text-white' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>{r}</button>
                                     ))}
                                 </div>
                             </div>
 
-                            {/* Day Filter */}
                             <div className="px-6 space-y-3">
                                 <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Day</h2>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-3 gap-2">
                                     {['TOTAL', 'D0', 'D1', 'D2', 'D3'].map(d => (
-                                        <button 
-                                            key={d}
-                                            onClick={() => setSelectedDay(d)}
-                                            className={`py-2 rounded-lg text-xs font-bold transition-all border ${
-                                                selectedDay === d ? 'bg-zinc-100 border-white text-zinc-900' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'
-                                            }`}
-                                        >
-                                            {d}
-                                        </button>
+                                        <button key={d} onClick={() => setSelectedDay(d)} className={`py-2 rounded-lg text-[10px] font-bold transition-all border ${selectedDay === d ? 'bg-zinc-100 border-white text-zinc-900' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>{d}</button>
                                     ))}
                                 </div>
                             </div>
                         </div>
 
                         <div className="p-6 border-t border-zinc-800 bg-zinc-900/30">
-                            <button className="w-full flex items-center justify-center gap-2 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-semibold transition-all">
-                                <Icon name="refresh-cw" className="w-4 h-4" />
-                                REFETCH DATA
+                            <button onClick={() => window.location.reload()} className="w-full flex items-center justify-center gap-2 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-semibold transition-all">
+                                <Icon name="refresh-cw" className="w-4 h-4" /> REFETCH DATA
                             </button>
                         </div>
                     </div>
 
-                    {/* Main Content */}
                     <div className="flex-1 flex flex-col overflow-hidden">
-                        {/* Header Navigation */}
                         <header className="h-16 border-b border-zinc-800 flex items-center justify-between px-8 glass z-10">
                             <nav className="flex gap-8">
-                                {['OVERLAY', 'COMPARE', 'ATTRIBUTION', 'STABILITY', 'MANAGER'].map(tab => (
-                                    <button 
-                                        key={tab}
-                                        onClick={() => setActiveTab(tab)}
-                                        className={`text-sm font-semibold transition-all relative py-5 ${
-                                            activeTab === tab ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
-                                        }`}
-                                    >
+                                {['OVERLAY', 'COMPARE', 'ATTRIBUTION', 'STABILITY'].map(tab => (
+                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`text-sm font-semibold transition-all relative py-5 ${activeTab === tab ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>
                                         {tab}
-                                        {activeTab === tab && (
-                                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />
-                                        )}
+                                        {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />}
                                     </button>
                                 ))}
                             </nav>
-
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800/50 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-400">
-                                    <Icon name="clock" className="w-3.5 h-3.5" />
-                                    <span>Last updated: Just now</span>
-                                </div>
-                                <button className="p-2 text-zinc-500 hover:text-white transition-all">
-                                    <Icon name="download" className="w-5 h-5" />
-                                </button>
-                            </div>
                         </header>
 
-                        {/* Viewport */}
                         <main className="flex-1 overflow-y-auto p-8 bg-[#0d0d0f]">
-                            {activeTab === 'OVERLAY' && <OverlayView />}
-                            {activeTab === 'COMPARE' && <div className="text-zinc-500 italic">Compare View Implementation Pending...</div>}
-                            {activeTab === 'ATTRIBUTION' && <div className="text-zinc-500 italic">Attribution View Implementation Pending...</div>}
-                            {activeTab === 'STABILITY' && <div className="text-zinc-500 italic">Stability View Implementation Pending...</div>}
+                            {activeTab === 'OVERLAY' && <OverlayView data={filteredData.backtest} selectedId={selectedTraderId} onSelect={setSelectedTraderId} />}
+                            {activeTab === 'COMPARE' && <CompareView backtest={filteredData.backtest} live={filteredData.live} selectedId={selectedTraderId} />}
+                            {activeTab === 'ATTRIBUTION' && <AttributionView data={filteredData.backtest.find(d => d.id === selectedTraderId)} />}
+                            {activeTab === 'STABILITY' && <StabilityView data={filteredData.backtest} />}
                         </main>
                     </div>
                 </div>
             );
         };
 
-        const OverlayView = () => {
+        const OverlayView = ({ data, selectedId, onSelect }) => {
+            const selectedRun = data.find(r => r.id === selectedId) || data[0];
+            if (!selectedRun) return <div className="text-zinc-500 italic">No backtest data available for these filters.</div>;
+
             const chartOptions = {
-                chart: {
-                    type: 'area',
-                    background: 'transparent',
-                    toolbar: { show: false },
-                    zoom: { enabled: true },
-                    animations: { enabled: true }
-                },
+                chart: { type: 'area', background: 'transparent', toolbar: { show: false }, zoom: { enabled: true } },
                 stroke: { curve: 'smooth', width: 2 },
-                fill: {
-                    type: 'gradient',
-                    gradient: {
-                        shadeIntensity: 1,
-                        opacityFrom: 0.3,
-                        opacityTo: 0.05,
-                        stops: [0, 100]
-                    }
-                },
-                colors: ['#3b82f6', '#10b981', '#f43f5e'],
-                grid: {
-                    borderColor: '#1f1f23',
-                    strokeDashArray: 4,
-                    xaxis: { lines: { show: true } }
-                },
-                xaxis: {
-                    labels: { style: { colors: '#71717a', fontSize: '10px' } },
-                    axisBorder: { show: false },
-                    axisTicks: { show: false }
-                },
-                yaxis: {
-                    labels: { 
-                        style: { colors: '#71717a', fontSize: '10px' },
-                        formatter: (v) => v.toLocaleString()
-                    }
-                },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.05 } },
+                colors: ['#3b82f6'],
+                grid: { borderColor: '#1f1f23', strokeDashArray: 4 },
+                xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+                yaxis: { labels: { style: { colors: '#71717a' }, formatter: (v) => v.toLocaleString() } },
                 tooltip: { theme: 'dark' },
                 legend: { show: false }
             };
 
-            const series = [
-                {
-                    name: 'Trader Adin V3',
-                    data: [10, 41, 35, 51, 49, 62, 69, 91, 148, 155, 170, 190]
-                }
-            ];
+            const series = [{ name: 'PnL', data: selectedRun.history.map(h => h.pnl) }];
 
             return (
                 <div className="space-y-6">
                     <div className="grid grid-cols-4 gap-6">
-                        <Card title="Total PnL">
-                            <div className="flex items-end justify-between">
-                                <h4 className="text-2xl font-bold mono">142,520</h4>
-                                <span className="text-emerald-500 text-sm font-bold flex items-center gap-1 mb-1">
-                                    <Icon name="trending-up" className="w-3 h-3" />
-                                    +12.4%
-                                </span>
-                            </div>
-                        </Card>
-                        <Card title="Max Drawdown">
-                            <h4 className="text-2xl font-bold mono text-rose-400">-3,210</h4>
-                        </Card>
-                        <Card title="Sharpe Ratio">
-                            <h4 className="text-2xl font-bold mono">2.84</h4>
-                        </Card>
-                        <Card title="Win Rate">
-                            <h4 className="text-2xl font-bold mono">64.2%</h4>
-                        </Card>
+                        <Card title="Total PnL"><h4 className="text-2xl font-bold mono">{selectedRun.final_pnl.toLocaleString()}</h4></Card>
+                        <Card title="Max Drawdown"><h4 className="text-2xl font-bold mono text-rose-400">{selectedRun.max_dd.toLocaleString()}</h4></Card>
+                        <Card title="Sharpe Ratio"><h4 className="text-2xl font-bold mono">{selectedRun.sharpe}</h4></Card>
+                        <Card title="Status"><div className="mt-1"><Badge color={selectedRun.status.toLowerCase()}>{selectedRun.status}</Badge></div></Card>
                     </div>
-
-                    <Card title="Portfolio PnL Curve">
-                        <div className="h-[400px]">
-                            <ApexCharts options={chartOptions} series={series} type="area" height="100%" />
-                        </div>
-                    </Card>
-
-                    <div className="grid grid-cols-3 gap-6">
-                        <div className="col-span-2">
-                            <Card title="Leaderboard">
-                                <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="text-[10px] uppercase text-zinc-500 border-b border-zinc-800">
-                                            <th className="pb-3 font-bold">Trader</th>
-                                            <th className="pb-3 font-bold">PnL</th>
-                                            <th className="pb-3 font-bold">Max DD</th>
-                                            <th className="pb-3 font-bold">Status</th>
-                                            <th className="pb-3 font-bold">Readiness</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="text-sm">
-                                        {[
-                                            { name: 'trader_adin_v3', pnl: 142520, dd: -3210, status: 'GREEN', readiness: 95 },
-                                            { name: 'trader_adin_v2', pnl: 98400, dd: -5400, status: 'AMBER', readiness: 82 },
-                                            { name: 'trader_phi', pnl: 45200, dd: -1200, status: 'GREEN', readiness: 88 },
-                                        ].map((t, idx) => (
-                                            <tr key={idx} className="border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-all cursor-pointer">
-                                                <td className="py-4 font-medium flex items-center gap-3">
-                                                    <div className="w-6 h-6 rounded bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400">
-                                                        {idx + 1}
-                                                    </div>
-                                                    {t.name}
-                                                </td>
-                                                <td className="py-4 mono font-semibold">{t.pnl.toLocaleString()}</td>
-                                                <td className="py-4 mono text-rose-400">{t.dd.toLocaleString()}</td>
-                                                <td className="py-4"><Badge color={t.status.toLowerCase()}>{t.status}</Badge></td>
-                                                <td className="py-4">
-                                                    <div className="w-24 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-blue-500" style={{ width: `${t.readiness}%` }} />
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </Card>
-                        </div>
-                        <Card title="Recent Activity">
-                            <div className="space-y-4">
-                                {[1, 2, 3, 4, 5].map(i => (
-                                    <div key={i} className="flex gap-3 text-xs">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5" />
-                                        <div className="space-y-1">
-                                            <p className="text-zinc-300 font-medium">New backtest run completed</p>
-                                            <p className="text-zinc-500">trader_adin_v3 • Round 5 • Day 2</p>
-                                            <p className="text-zinc-600 text-[10px]">2 hours ago</p>
-                                        </div>
-                                    </div>
+                    <Card title="Portfolio PnL Curve"><div className="h-[400px]"><Chart options={chartOptions} series={series} type="area" height="100%" /></div></Card>
+                    <Card title="Leaderboard">
+                        <table className="w-full text-left">
+                            <thead><tr className="text-[10px] uppercase text-zinc-500 border-b border-zinc-800"><th className="pb-3 font-bold">Trader</th><th className="pb-3 font-bold">PnL</th><th className="pb-3 font-bold">Max DD</th><th className="pb-3 font-bold">Status</th></tr></thead>
+                            <tbody className="text-sm">
+                                {data.map((t, idx) => (
+                                    <tr key={t.id} onClick={() => onSelect(t.id)} className={`border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-all cursor-pointer ${selectedId === t.id ? 'bg-blue-500/5' : ''}`}>
+                                        <td className="py-4 font-medium flex items-center gap-3"><div className="w-6 h-6 rounded bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400">{idx + 1}</div>{t.trader}</td>
+                                        <td className="py-4 mono font-semibold">{t.final_pnl.toLocaleString()}</td>
+                                        <td className="py-4 mono text-rose-400">{t.max_dd.toLocaleString()}</td>
+                                        <td className="py-4"><Badge color={t.status.toLowerCase()}>{t.status}</Badge></td>
+                                    </tr>
                                 ))}
-                            </div>
-                        </Card>
-                    </div>
+                            </tbody>
+                        </table>
+                    </Card>
                 </div>
+            );
+        };
+
+        const CompareView = ({ backtest, live, selectedId }) => {
+            const btRun = backtest.find(r => r.id === selectedId) || backtest[0];
+            const liveRun = live.find(r => r.trader === btRun?.trader);
+            if (!btRun) return <div className="text-zinc-500 italic">No backtest data for comparison.</div>;
+
+            const chartOptions = {
+                chart: { type: 'line', background: 'transparent', toolbar: { show: false } },
+                stroke: { curve: 'smooth', width: 2 },
+                colors: ['#3b82f6', '#f43f5e'],
+                grid: { borderColor: '#1f1f23' },
+                xaxis: { labels: { show: false } },
+                yaxis: { labels: { style: { colors: '#71717a' }, formatter: (v) => v.toLocaleString() } },
+                tooltip: { theme: 'dark' },
+                legend: { show: true, position: 'top', horizontalAlign: 'right', labels: { colors: '#e4e4e7' } }
+            };
+
+            const series = [
+                { name: 'Backtest', data: btRun.history.map(h => h.pnl) },
+                { name: 'Live', data: liveRun?.history.map(h => h.pnl) || [] }
+            ];
+
+            return (
+                <div className="space-y-6">
+                    <Card title={`Backtest vs Live: ${btRun.trader}`}><div className="h-[500px]"><Chart options={chartOptions} series={series} type="line" height="100%" /></div></Card>
+                </div>
+            );
+        };
+
+        const AttributionView = ({ data }) => {
+            if (!data) return <div className="text-zinc-500 italic">Select a run to view attribution.</div>;
+            const products = Object.keys(data.history[0].products);
+            const series = products.map(p => ({ name: p, data: data.history.map(h => h.products[p]) }));
+            const chartOptions = {
+                chart: { type: 'bar', stacked: true, background: 'transparent', toolbar: { show: false } },
+                plotOptions: { bar: { horizontal: false } },
+                xaxis: { labels: { show: false } },
+                yaxis: { labels: { style: { colors: '#71717a' }, formatter: (v) => v.toLocaleString() } },
+                legend: { position: 'top', labels: { colors: '#e4e4e7' } },
+                tooltip: { theme: 'dark' }
+            };
+            return <Card title="Product PnL Attribution"><div className="h-[500px]"><Chart options={chartOptions} series={series} type="bar" height="100%" /></div></Card>;
+        };
+
+        const StabilityView = ({ data }) => {
+            const traders = Array.from(new Set(data.map(d => d.trader)));
+            return (
+                <Card title="Strategy Stability Matrix">
+                    <table className="w-full text-left">
+                        <thead><tr className="text-[10px] uppercase text-zinc-500"><th className="p-4">Strategy</th>{['D0', 'D1', 'D2', 'D3'].map(d => <th key={d} className="p-4 text-center">{d}</th>)}</tr></thead>
+                        <tbody>
+                            {traders.map(trader => (
+                                <tr key={trader} className="border-t border-zinc-800">
+                                    <td className="p-4 font-medium">{trader}</td>
+                                    {['D0', 'D1', 'D2', 'D3'].map(day => {
+                                        const run = data.find(d => d.trader === trader && d.day === day);
+                                        const pnl = run?.final_pnl || 0;
+                                        return <td key={day} className="p-2"><div className={`h-10 rounded flex items-center justify-center text-xs font-bold ${pnl > 0 ? 'bg-emerald-500/20 text-emerald-400' : pnl < 0 ? 'bg-rose-500/20 text-rose-400' : 'bg-zinc-800 text-zinc-500'}`}>{pnl ? `${(pnl / 1000).toFixed(1)}k` : '-'}</div></td>;
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </Card>
             );
         };
 
