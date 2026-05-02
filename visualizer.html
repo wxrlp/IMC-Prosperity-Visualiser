@@ -91,6 +91,18 @@
 
     /* Empty state */
     .empty{padding:80px;text-align:center;color:#444;font-style:italic;border:2px dashed var(--border);border-radius:32px}
+
+    /* Upload drop zone */
+    .dropzone{border:2px dashed #333;border-radius:24px;padding:60px 40px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface)}
+    .dropzone:hover,.dropzone.dragover{border-color:var(--accent);background:rgba(0,255,157,0.03)}
+    .dropzone-icon{font-size:40px;margin-bottom:16px}
+    .dropzone-title{font-size:16px;font-weight:800;margin-bottom:8px}
+    .dropzone-sub{font-size:12px;color:#555}
+    .upload-list{margin-top:20px}
+    .upload-item{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border:1px solid var(--border);border-radius:14px;margin-bottom:8px;background:var(--surface)}
+    .upload-item-name{font-size:12px;font-weight:700}
+    .upload-item-pnl{font-size:12px;font-weight:900}
+    .upload-item-remove{background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px;padding:4px 8px}
   </style>
 </head>
 <body>
@@ -118,6 +130,13 @@
       </div>
     </div>
     <div class="sidebar-spacer"></div>
+    <div>
+      <div class="section-label">Upload</div>
+      <button class="source-btn active" id="upload-trigger-btn"
+              style="width:100%;padding:12px;font-size:10px;background:rgba(0,255,157,0.08);border-color:var(--accent);color:var(--accent)"
+              onclick="document.getElementById('file-input').click()">📂 DROP OR CLICK</button>
+      <input type="file" id="file-input" accept=".log,.json" multiple hidden>
+    </div>
   </div>
 
   <div id="main">
@@ -139,8 +158,9 @@
   <script>
   (function(){
     // --- State ---
-    const SOURCES = ['BACKTEST','LIVE','I4BT','REAL','SCENARIO','STRESS'];
+    const SOURCES = ['BACKTEST','LIVE','I4BT','UPLOAD'];
     const TABS = ['OVERLAY','COMPARE','ATTRIBUTION'];
+    window.UPLOADED_DATA = window.UPLOADED_DATA || [];
     let state = {
       source: 'BACKTEST',
       tab: 'OVERLAY',
@@ -157,12 +177,188 @@
         BACKTEST: window.BACKTEST_DATA || [],
         LIVE: window.LIVE_LOG_DATA || [],
         I4BT: window.I4BT_DATA || [],
-        REAL: window.REAL_DATA_RESULTS || [],
-        SCENARIO: window.SCENARIO_RESULTS || [],
-        STRESS: window.STRESS_RESULTS || []
+        UPLOAD: window.UPLOADED_DATA || []
       };
       return map[state.source] || [];
     }
+
+    // --- Log File Parser ---
+    function parseLogFile(text, filename) {
+      // Try JSON format first (submission.log from Rust backtester)
+      try {
+        const json = JSON.parse(text);
+        if (json.activitiesLog) {
+          return parseActivitiesCsv(
+            json.activitiesLog,
+            json.submissionId || filename,
+            filename
+          );
+        }
+      } catch(e) { /* not JSON, try plain text */ }
+
+      // Plain-text IMC Prosperity log format
+      const marker = 'Activities log:';
+      const idx = text.indexOf(marker);
+      if (idx !== -1) {
+        const csvPart = text.substring(idx + marker.length).trim();
+        return parseActivitiesCsv(csvPart, filename, filename);
+      }
+
+      // Fallback: try treating entire file as semicolon CSV
+      if (text.includes('timestamp') && text.includes('product')) {
+        return parseActivitiesCsv(text, filename, filename);
+      }
+
+      return null; // unrecognized
+    }
+
+    function parseActivitiesCsv(csv, runId, filename) {
+      const lines = csv.trim().split('\n');
+      if (lines.length < 2) return null;
+      const header = lines[0].split(';');
+      const tsIdx = header.indexOf('timestamp');
+      const prodIdx = header.indexOf('product');
+      const midIdx = header.indexOf('mid_price');
+      const pnlIdx = header.indexOf('profit_and_loss');
+      if (tsIdx < 0 || prodIdx < 0 || pnlIdx < 0) return null;
+
+      const history = [];
+      const pnlByProduct = {};
+      const productSet = new Set();
+      let lastPnlByTs = {};
+      let maxTs = 0;
+
+      // Sample every N rows to keep it responsive
+      const sampleRate = Math.max(1, Math.floor(lines.length / 2000));
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(';');
+        if (cols.length < Math.max(tsIdx, prodIdx, pnlIdx) + 1) continue;
+        const ts = parseInt(cols[tsIdx]);
+        const sym = cols[prodIdx];
+        const pnl = parseFloat(cols[pnlIdx]);
+        if (isNaN(ts) || isNaN(pnl)) continue;
+
+        productSet.add(sym);
+        pnlByProduct[sym] = pnl;
+        if (ts > maxTs) maxTs = ts;
+
+        if (i % sampleRate === 0) {
+          // Aggregate PnL across products at this tick
+          lastPnlByTs[ts] = (lastPnlByTs[ts] || 0) + pnl;
+        }
+      }
+
+      // Build sorted history from aggregated timestamps
+      const timestamps = Object.keys(lastPnlByTs)
+        .map(Number).sort((a, b) => a - b);
+      
+      // Re-aggregate: sum all product PnLs per unique timestamp
+      const aggPnl = {};
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(';');
+        if (cols.length < Math.max(tsIdx, prodIdx, pnlIdx) + 1) continue;
+        const ts = parseInt(cols[tsIdx]);
+        const pnl = parseFloat(cols[pnlIdx]);
+        if (isNaN(ts) || isNaN(pnl)) continue;
+        aggPnl[ts] = (aggPnl[ts] || 0) + pnl;
+      }
+
+      const allTs = Object.keys(aggPnl).map(Number).sort((a, b) => a - b);
+      // Downsample to ~200 points for smooth charting
+      const step = Math.max(1, Math.floor(allTs.length / 200));
+      const historyArr = [];
+      for (let i = 0; i < allTs.length; i += step) {
+        const t = allTs[i];
+        historyArr.push({ pnl: aggPnl[t], products: {} });
+      }
+      // Always include last point
+      if (allTs.length > 0) {
+        const lastT = allTs[allTs.length - 1];
+        historyArr.push({ pnl: aggPnl[lastT], products: {} });
+      }
+
+      const totalPnl = Object.values(pnlByProduct)
+        .reduce((a, b) => a + b, 0);
+
+      // Compute max drawdown
+      let peak = -Infinity, maxDd = 0;
+      historyArr.forEach(h => {
+        if (h.pnl > peak) peak = h.pnl;
+        const dd = peak - h.pnl;
+        if (dd > maxDd) maxDd = dd;
+      });
+
+      return {
+        id: 'upload_' + runId.replace(/[^a-zA-Z0-9]/g, '_'),
+        trader: filename.replace(/\.[^.]+$/, ''),
+        round: '',
+        day: '',
+        status: 'UPLOADED',
+        final_pnl: Math.round(totalPnl * 100) / 100,
+        max_dd: Math.round(maxDd * 100) / 100,
+        sharpe: 0,
+        final_pnl_by_product: pnlByProduct,
+        history: historyArr
+      };
+    }
+
+    // --- File Upload Handling ---
+    function handleFiles(files) {
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const result = parseLogFile(e.target.result, file.name);
+          if (result) {
+            // Remove duplicate if same filename uploaded again
+            window.UPLOADED_DATA = window.UPLOADED_DATA
+              .filter(d => d.trader !== result.trader);
+            window.UPLOADED_DATA.push(result);
+            state.source = 'UPLOAD';
+            state.selectedId = result.id;
+            // Update slider max
+            const slider = document.getElementById('tick-slider');
+            slider.max = Math.max(result.history.length - 1, 1);
+            state.tick = 0;
+            slider.value = 0;
+            document.getElementById('tick-display').textContent = '0';
+            renderAll();
+          } else {
+            alert('Could not parse: ' + file.name +
+              '\n\nSupported formats:\n' +
+              '• JSON with activitiesLog (submission.log)\n' +
+              '• Plain text with "Activities log:" section');
+          }
+        };
+        reader.readAsText(file);
+      });
+    }
+
+    // Wire up file input
+    document.getElementById('file-input')
+      .addEventListener('change', function(e) {
+        handleFiles(e.target.files);
+        e.target.value = ''; // reset so same file can be re-uploaded
+      });
+
+    // Drag and drop on the whole page
+    document.body.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      document.getElementById('upload-trigger-btn')
+        .style.borderColor = '#00ff9d';
+    });
+    document.body.addEventListener('dragleave', function(e) {
+      document.getElementById('upload-trigger-btn')
+        .style.borderColor = '';
+    });
+    document.body.addEventListener('drop', function(e) {
+      e.preventDefault();
+      document.getElementById('upload-trigger-btn')
+        .style.borderColor = '';
+      const files = Array.from(e.dataTransfer.files)
+        .filter(f => f.name.endsWith('.log') || f.name.endsWith('.json'));
+      if (files.length) handleFiles(files);
+    });
 
     function getSelected() {
       const data = getData();

@@ -1,91 +1,57 @@
-# IMC Prosperity Visualizer | Premium Edition
+# ProsperityX Visualizer
 
-A high-performance, aesthetically pleasing visualizer for analyzing and comparing IMC Prosperity trading strategies.
+Browser-native strategy visualizer for IMC Prosperity. Interactive PnL charts, multi-strategy comparison, and product attribution — zero build step, just open `index.html`.
 
-![Visualizer Preview](https://img.shields.io/badge/Aesthetics-Premium-blue)
-![Tech Stack](https://img.shields.io/badge/Tech-React%20%7C%20Tailwind%20%7C%20ApexCharts-emerald)
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://wxrlp.github.io/IMC-Prosperity-Visualiser/)
-
-## 🌐 Live Demo
-
-You can view the visualizer live at: **[https://wxrlp.github.io/IMC-Prosperity-Visualiser/](https://wxrlp.github.io/IMC-Prosperity-Visualiser/)**
-
-## 🚀 Deployment Instructions
-
-If the GitHub Pages link above is not working yet, follow these exact steps:
-
-1.  **Select Source**: In your GitHub repository, go to **Settings** -> **Pages**.
-2.  **Build and deployment**: Look for the dropdown under **Source**. 
-    *   Make sure it says **Deploy from a branch**.
-3.  **Select Branch**: Under **Branch**, select `main` (or `master`) from the first dropdown.
-4.  **Select Folder**: Ensure the second dropdown says `/(root)`.
-5.  **Save**: Click the **Save** button.
-    *   *Note: If you only see "Custom Domain" or "GitHub Actions", look higher up the page for the "Build and deployment" section.*
-6.  **Refresh**: After saving, wait about 60 seconds and refresh the page. A green bar will appear with the text "Your site is live at...".
+[![Live Demo](https://img.shields.io/badge/Live-Demo-00ff9d?style=for-the-badge)](https://wxrlp.github.io/IMC-Prosperity-Visualiser/)
 
 ## Features
 
-- **OVERLAY**: Multi-trader leaderboard and portfolio PnL curves.
-- **COMPARE**: Synchronized charts to compare Backtest results with Live log performance.
-- **ATTRIBUTION**: Product-level PnL breakdown to identify alpha sources.
-- **STABILITY**: Heatmaps showing performance consistency across multiple days and rounds.
-- **Interactive Filtering**: Real-time filtering by Source, Round, and Day.
+- **Overlay** — Equity curve, KPI cards (PnL / Drawdown / Sharpe), product exposure gauges, and a strategy leaderboard
+- **Compare** — Overlay two strategies and visualize the alpha (PnL diff) between them
+- **Attribution** — Product-level PnL breakdown with contribution percentages
+- **Playback** — Scrub through session ticks to see how metrics evolve over time
+- **Multi-source** — Switch between Backtest, Live, I4BT, Real-world, Scenario, and Stress test data
 
-## Getting Started
+## Quick Start
 
-1. **Open the Visualizer**: Simply open `visualizer.html` in any modern web browser.
-2. **Data Integration**: The visualizer looks for the following files in the same directory:
-   - `backtest_comparison.js`: Your backtest results.
-   - `i4bt_comparison.js`: Results from the i4bt backtester.
-   - `live_comparison.js`: Live trading logs.
-3. **Sample Data**: If no comparison files are found, the visualizer will automatically load `sample_data.js` to demonstrate its capabilities.
+**Option 1 — GitHub Pages (no install)**
+
+Visit the [live demo](https://wxrlp.github.io/IMC-Prosperity-Visualiser/).
+
+**Option 2 — Local**
+
+```bash
+# Clone and open
+git clone https://github.com/wxrlp/IMC-Prosperity-Visualiser.git
+open IMC-Prosperity-Visualiser/index.html
+```
+
+**Option 3 — With the data server** (for dynamic log parsing)
+
+```bash
+python3 tools_v2/visualizer_loader_server.py
+# Then visit http://127.0.0.1:8765/
+```
 
 ## Data Format
 
-To use your own data, ensure your `.js` files define the following global variables:
+Drop a `backtest_comparison.js` file alongside `index.html` defining:
 
-### Backtest Data (`backtest_comparison.js`)
-```javascript
-window.BACKTEST_DATA = [
-    {
-        id: "unique_run_id",
-        trader: "trader_name",
-        round: "R5",
-        day: "D0",
-        final_pnl: 150000,
-        max_dd: -2000,
-        sharpe: 3.1,
-        status: "GREEN",
-        history: [
-            { tick: 0, pnl: 0, products: { "PRODUCT_A": 0, "PRODUCT_B": 0 } },
-            // ... more ticks
-        ]
-    }
-];
+```js
+const BACKTEST_DATA = {
+  "run_id": {
+    "trader": "my_trader",
+    "day": 0,
+    "round": 3,
+    "final_pnl": 15000,
+    "final_pnl_by_product": { "PRODUCT_A": 10000, "PRODUCT_B": 5000 },
+    "history": [{ "ts": 0, "symbol": "PRODUCT_A", "pnl": 0 }, ...]
+  }
+};
 ```
 
-### Live Data (`live_comparison.js`)
-```javascript
-window.LIVE_LOG_DATA = [
-    {
-        trader: "trader_name", // Must match backtest trader name for comparison
-        round: "R5",
-        day: "D0",
-        final_pnl: 148000,
-        history: [
-            { tick: 0, pnl: 0 },
-            // ... more ticks
-        ]
-    }
-];
-```
+Or use `sample_data.js` as a reference.
 
-## Tech Stack
+## Tech
 
-- **React 18**: UI logic and state management.
-- **Tailwind CSS**: Modern, utility-first styling with glassmorphism.
-- **ApexCharts**: High-performance, interactive charting.
-- **Lucide Icons**: Crisp, professional iconography.
-
----
-*Built for the IMC Prosperity Challenge.*
+Vanilla JS + [ApexCharts](https://apexcharts.com/) + CSS. No framework, no build step, no transpiler.
