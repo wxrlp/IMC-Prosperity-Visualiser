@@ -80,9 +80,9 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             self._json({"ok": False, "error": str(exc)}, 500)
 
     def _rebuild_backtest_dataset(self) -> dict:
-        parser_script = self.repo_root / "tools" / "parse_runs.py"
+        parser_script = self.repo_root / "tools_v2" / "parse_runs.py"
         if not parser_script.exists():
-            return {"ok": False, "skipped": True, "reason": "tools/parse_runs.py not found"}
+            return {"ok": False, "skipped": True, "reason": "tools_v2/parse_runs.py not found"}
         proc = subprocess.run(
             [sys.executable, str(parser_script)],
             cwd=str(self.repo_root),

@@ -3,222 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IMC Prosperity Visualizer | Premium Edition</title>
+    <title>IMC Prosperity | Unified Visualizer</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-apexcharts@1.4.1/dist/react-apexcharts.iife.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #0a0a0c; color: #e4e4e7; margin: 0; }
+        :root { --accent: #00ff9d; --bg: #040508; --surface: #0a0c10; --border: #1a1e26; }
+        body { font-family: 'Outfit', sans-serif; background-color: var(--bg); color: #e2e8f0; margin: 0; }
         .mono { font-family: 'JetBrains Mono', monospace; }
-        .glass { background: rgba(18, 18, 23, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #0a0a0c; }
-        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+        .glass { background: rgba(10, 12, 16, 0.8); backdrop-filter: blur(16px); border: 1px solid var(--border); }
+        .accent-glow { text-shadow: 0 0 10px rgba(0, 255, 157, 0.4); }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; }
     </style>
 </head>
 <body class="h-screen overflow-hidden">
     <div id="root" class="h-full"></div>
 
     <script src="sample_data.js"></script>
-    <!-- Fallback for actual comparison files -->
-    <script src="backtest_comparison.js" onerror="console.log('backtest_comparison.js not found')"></script>
-    <script src="i4bt_comparison.js" onerror="console.log('i4bt_comparison.js not found')"></script>
-    <script src="live_comparison.js" onerror="console.log('live_comparison.js not found')"></script>
+    <script src="backtest_comparison.js" onerror="console.log('BT data missing')"></script>
+    <script src="live_comparison.js" onerror="console.log('Live data missing')"></script>
+    <script src="i4bt_comparison.js" onerror="console.log('I4BT data missing')"></script>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
-
-        // Alias for the chart component
         const Chart = window.ReactApexCharts.default;
 
-        // --- UI Components ---
-        const Icon = ({ name, className = "" }) => {
-            useEffect(() => {
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-            }, [name]);
-            return <i data-lucide={name} className={className}></i>;
+        // --- Shared Components ---
+        const Icon = ({ name, size = 18, className = "" }) => {
+            useEffect(() => { window.lucide && window.lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} style={{width: size, height: size}} className={className}></i>;
         };
 
-        const Card = ({ children, title, className = "" }) => (
-            <div className={`glass rounded-xl p-5 ${className}`}>
-                {title && <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-4">{title}</h3>}
+        const Card = ({ children, title, subtitle, className = "" }) => (
+            <div className={`glass rounded-2xl p-6 ${className}`}>
+                {title && (
+                    <div className="mb-6">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{title}</h3>
+                        {subtitle && <p className="text-sm text-zinc-400 mt-1">{subtitle}</p>}
+                    </div>
+                )}
                 {children}
             </div>
         );
 
-        const Badge = ({ children, color = "blue" }) => {
+        const Badge = ({ children, color = "emerald" }) => {
             const colors = {
-                blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-                green: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-                red: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+                emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                rose: "bg-rose-500/10 text-rose-400 border-rose-500/20",
                 amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+                blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
                 zinc: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
             };
-            return (
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${colors[color]}`}>
-                    {children}
-                </span>
-            );
+            return <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${colors[color]}`}>{children}</span>;
         };
 
-        // --- Main App ---
-        const App = () => {
-            const [activeTab, setActiveTab] = useState('OVERLAY');
-            const [selectedRound, setSelectedRound] = useState('R5');
-            const [selectedDay, setSelectedDay] = useState('TOTAL');
-            const [selectedSources, setSelectedSources] = useState(['BACKTEST']);
-            const [selectedTraderId, setSelectedTraderId] = useState(null);
-            
-            const rawData = useMemo(() => ({
-                backtest: window.BACKTEST_DATA || [],
-                i4bt: window.I4BT_DATA || [],
-                live: window.LIVE_LOG_DATA || []
-            }), []);
-
-            const filteredData = useMemo(() => {
-                const result = { backtest: [], i4bt: [], live: [] };
-                selectedSources.forEach(src => {
-                    const srcKey = src.toLowerCase();
-                    result[srcKey] = (rawData[srcKey] || []).filter(d => 
-                        (selectedRound === 'TOTAL' || d.round === selectedRound) &&
-                        (selectedDay === 'TOTAL' || d.day === selectedDay)
-                    );
-                });
-                return result;
-            }, [selectedSources, selectedRound, selectedDay, rawData]);
-
-            useEffect(() => {
-                if (!selectedTraderId && filteredData.backtest.length > 0) {
-                    setSelectedTraderId(filteredData.backtest[0].id);
-                }
-            }, [filteredData]);
-
-            return (
-                <div className="flex h-full w-full">
-                    {/* Sidebar */}
-                    <div className="w-64 border-r border-zinc-800 flex flex-col glass z-10">
-                        <div className="p-6 border-b border-zinc-800">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/20">
-                                    <Icon name="activity" className="text-white w-5 h-5" />
-                                </div>
-                                <h1 className="font-bold text-lg tracking-tight">Prosperity<span className="text-blue-500">Viz</span></h1>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto py-6 space-y-8">
-                            <div className="px-6 space-y-3">
-                                <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Sources</h2>
-                                <div className="space-y-1">
-                                    {['BACKTEST', 'I4BT', 'LIVE'].map(src => (
-                                        <button 
-                                            key={src}
-                                            onClick={() => setSelectedSources(prev => prev.includes(src) ? prev.filter(s => s !== src) : [...prev, src])}
-                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all ${selectedSources.includes(src) ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                        >
-                                            <span className="flex items-center gap-2">
-                                                <div className={`w-1.5 h-1.5 rounded-full ${src === 'BACKTEST' ? 'bg-blue-500' : src === 'I4BT' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                                                {src}
-                                            </span>
-                                            {selectedSources.includes(src) && <Icon name="check" className="w-3 h-3" />}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="px-6 space-y-3">
-                                <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Rounds</h2>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {['TOTAL', 'R3', 'R4', 'R5'].map(r => (
-                                        <button key={r} onClick={() => setSelectedRound(r)} className={`py-2 rounded-lg text-[10px] font-bold transition-all border ${selectedRound === r ? 'bg-blue-600 border-blue-500 text-white' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>{r}</button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="px-6 space-y-3">
-                                <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Day</h2>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {['TOTAL', 'D0', 'D1', 'D2', 'D3'].map(d => (
-                                        <button key={d} onClick={() => setSelectedDay(d)} className={`py-2 rounded-lg text-[10px] font-bold transition-all border ${selectedDay === d ? 'bg-zinc-100 border-white text-zinc-900' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>{d}</button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="p-6 border-t border-zinc-800 bg-zinc-900/30">
-                            <button onClick={() => window.location.reload()} className="w-full flex items-center justify-center gap-2 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-semibold transition-all">
-                                <Icon name="refresh-cw" className="w-4 h-4" /> REFETCH DATA
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        <header className="h-16 border-b border-zinc-800 flex items-center justify-between px-8 glass z-10">
-                            <nav className="flex gap-8">
-                                {['OVERLAY', 'COMPARE', 'ATTRIBUTION', 'STABILITY'].map(tab => (
-                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`text-sm font-semibold transition-all relative py-5 ${activeTab === tab ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                                        {tab}
-                                        {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />}
-                                    </button>
-                                ))}
-                            </nav>
-                        </header>
-
-                        <main className="flex-1 overflow-y-auto p-8 bg-[#0d0d0f]">
-                            {activeTab === 'OVERLAY' && <OverlayView data={filteredData.backtest} selectedId={selectedTraderId} onSelect={setSelectedTraderId} />}
-                            {activeTab === 'COMPARE' && <CompareView backtest={filteredData.backtest} live={filteredData.live} selectedId={selectedTraderId} />}
-                            {activeTab === 'ATTRIBUTION' && <AttributionView data={filteredData.backtest.find(d => d.id === selectedTraderId)} />}
-                            {activeTab === 'STABILITY' && <StabilityView data={filteredData.backtest} />}
-                        </main>
-                    </div>
-                </div>
-            );
-        };
-
+        // --- Views ---
         const OverlayView = ({ data, selectedId, onSelect }) => {
-            const selectedRun = data.find(r => r.id === selectedId) || data[0];
-            if (!selectedRun) return <div className="text-zinc-500 italic">No backtest data available for these filters.</div>;
+            const selected = data.find(d => d.id === selectedId) || data[0];
+            if (!selected) return <div className="p-10 text-center text-zinc-500 italic">No backtest records found for the current filter.</div>;
 
             const chartOptions = {
-                chart: { type: 'area', background: 'transparent', toolbar: { show: false }, zoom: { enabled: true } },
+                chart: { type: 'area', background: 'transparent', toolbar: { show: false }, animations: { enabled: true } },
                 stroke: { curve: 'smooth', width: 2 },
-                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.05 } },
-                colors: ['#3b82f6'],
-                grid: { borderColor: '#1f1f23', strokeDashArray: 4 },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 90, 100] } },
+                colors: ['#00ff9d'],
+                grid: { borderColor: '#1a1e26', strokeDashArray: 4 },
                 xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
-                yaxis: { labels: { style: { colors: '#71717a' }, formatter: (v) => v.toLocaleString() } },
-                tooltip: { theme: 'dark' },
+                yaxis: { labels: { style: { colors: '#545d6a' }, formatter: (v) => v.toLocaleString() } },
+                tooltip: { theme: 'dark', x: { show: false } },
                 legend: { show: false }
             };
 
-            const series = [{ name: 'PnL', data: selectedRun.history.map(h => h.pnl) }];
+            const series = [{ name: 'PnL', data: selected.history.map(h => h.pnl) }];
 
             return (
                 <div className="space-y-6">
                     <div className="grid grid-cols-4 gap-6">
-                        <Card title="Total PnL"><h4 className="text-2xl font-bold mono">{selectedRun.final_pnl.toLocaleString()}</h4></Card>
-                        <Card title="Max Drawdown"><h4 className="text-2xl font-bold mono text-rose-400">{selectedRun.max_dd.toLocaleString()}</h4></Card>
-                        <Card title="Sharpe Ratio"><h4 className="text-2xl font-bold mono">{selectedRun.sharpe}</h4></Card>
-                        <Card title="Status"><div className="mt-1"><Badge color={selectedRun.status.toLowerCase()}>{selectedRun.status}</Badge></div></Card>
+                        <Card title="Total PnL"><div className="text-3xl font-black mono accent-glow text-[#00ff9d]">{selected.final_pnl.toLocaleString()}</div></Card>
+                        <Card title="Max Drawdown"><div className="text-3xl font-black mono text-rose-500">{selected.max_dd.toLocaleString()}</div></Card>
+                        <Card title="Sharpe Ratio"><div className="text-3xl font-black mono">{selected.sharpe}</div></Card>
+                        <Card title="Readiness"><div className="mt-2"><Badge color={selected.status === 'ACCEPTED' ? 'emerald' : 'amber'}>{selected.status}</Badge></div></Card>
                     </div>
-                    <Card title="Portfolio PnL Curve"><div className="h-[400px]"><Chart options={chartOptions} series={series} type="area" height="100%" /></div></Card>
-                    <Card title="Leaderboard">
+
+                    <Card title="Portfolio PnL Performance">
+                        <div className="h-[400px]"><Chart options={chartOptions} series={series} type="area" height="100%" /></div>
+                    </Card>
+
+                    <Card title="Strategy Leaderboard">
                         <table className="w-full text-left">
-                            <thead><tr className="text-[10px] uppercase text-zinc-500 border-b border-zinc-800"><th className="pb-3 font-bold">Trader</th><th className="pb-3 font-bold">PnL</th><th className="pb-3 font-bold">Max DD</th><th className="pb-3 font-bold">Status</th></tr></thead>
+                            <thead>
+                                <tr className="text-[10px] font-black uppercase text-zinc-600 border-b border-zinc-800">
+                                    <th className="pb-4">Strategy</th>
+                                    <th className="pb-4">PnL</th>
+                                    <th className="pb-4">Sharpe</th>
+                                    <th className="pb-4">Status</th>
+                                </tr>
+                            </thead>
                             <tbody className="text-sm">
-                                {data.map((t, idx) => (
-                                    <tr key={t.id} onClick={() => onSelect(t.id)} className={`border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-all cursor-pointer ${selectedId === t.id ? 'bg-blue-500/5' : ''}`}>
-                                        <td className="py-4 font-medium flex items-center gap-3"><div className="w-6 h-6 rounded bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400">{idx + 1}</div>{t.trader}</td>
-                                        <td className="py-4 mono font-semibold">{t.final_pnl.toLocaleString()}</td>
-                                        <td className="py-4 mono text-rose-400">{t.max_dd.toLocaleString()}</td>
-                                        <td className="py-4"><Badge color={t.status.toLowerCase()}>{t.status}</Badge></td>
+                                {data.map(t => (
+                                    <tr key={t.id} onClick={() => onSelect(t.id)} className={`border-b border-zinc-800/50 hover:bg-white/5 transition-all cursor-pointer ${selectedId === t.id ? 'bg-[#00ff9d]/5' : ''}`}>
+                                        <td className="py-4 font-bold">{t.trader} <span className="text-zinc-600 font-normal ml-2">{t.round} {t.day}</span></td>
+                                        <td className="py-4 mono font-bold text-zinc-300">{t.final_pnl.toLocaleString()}</td>
+                                        <td className="py-4 mono text-zinc-400">{t.sharpe}</td>
+                                        <td className="py-4"><Badge color={t.status === 'ACCEPTED' ? 'emerald' : 'amber'}>{t.status}</Badge></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -228,69 +121,178 @@
             );
         };
 
-        const CompareView = ({ backtest, live, selectedId }) => {
-            const btRun = backtest.find(r => r.id === selectedId) || backtest[0];
-            const liveRun = live.find(r => r.trader === btRun?.trader);
-            if (!btRun) return <div className="text-zinc-500 italic">No backtest data for comparison.</div>;
-
-            const chartOptions = {
-                chart: { type: 'line', background: 'transparent', toolbar: { show: false } },
-                stroke: { curve: 'smooth', width: 2 },
-                colors: ['#3b82f6', '#f43f5e'],
-                grid: { borderColor: '#1f1f23' },
-                xaxis: { labels: { show: false } },
-                yaxis: { labels: { style: { colors: '#71717a' }, formatter: (v) => v.toLocaleString() } },
-                tooltip: { theme: 'dark' },
-                legend: { show: true, position: 'top', horizontalAlign: 'right', labels: { colors: '#e4e4e7' } }
-            };
-
-            const series = [
-                { name: 'Backtest', data: btRun.history.map(h => h.pnl) },
-                { name: 'Live', data: liveRun?.history.map(h => h.pnl) || [] }
-            ];
-
-            return (
-                <div className="space-y-6">
-                    <Card title={`Backtest vs Live: ${btRun.trader}`}><div className="h-[500px]"><Chart options={chartOptions} series={series} type="line" height="100%" /></div></Card>
-                </div>
-            );
-        };
-
-        const AttributionView = ({ data }) => {
-            if (!data) return <div className="text-zinc-500 italic">Select a run to view attribution.</div>;
-            const products = Object.keys(data.history[0].products);
-            const series = products.map(p => ({ name: p, data: data.history.map(h => h.products[p]) }));
-            const chartOptions = {
-                chart: { type: 'bar', stacked: true, background: 'transparent', toolbar: { show: false } },
-                plotOptions: { bar: { horizontal: false } },
-                xaxis: { labels: { show: false } },
-                yaxis: { labels: { style: { colors: '#71717a' }, formatter: (v) => v.toLocaleString() } },
-                legend: { position: 'top', labels: { colors: '#e4e4e7' } },
-                tooltip: { theme: 'dark' }
-            };
-            return <Card title="Product PnL Attribution"><div className="h-[500px]"><Chart options={chartOptions} series={series} type="bar" height="100%" /></div></Card>;
-        };
-
         const StabilityView = ({ data }) => {
             const traders = Array.from(new Set(data.map(d => d.trader)));
+            const days = ['D0', 'D1', 'D2', 'D3'];
             return (
-                <Card title="Strategy Stability Matrix">
-                    <table className="w-full text-left">
-                        <thead><tr className="text-[10px] uppercase text-zinc-500"><th className="p-4">Strategy</th>{['D0', 'D1', 'D2', 'D3'].map(d => <th key={d} className="p-4 text-center">{d}</th>)}</tr></thead>
+                <Card title="Stability Matrix" subtitle="PnL consistency across multiple days of competition.">
+                    <table className="w-full">
+                        <thead>
+                            <tr>
+                                <th className="p-4 text-left text-[10px] uppercase text-zinc-600 font-black">Strategy</th>
+                                {days.map(d => <th key={d} className="p-4 text-[10px] uppercase text-zinc-600 font-black text-center">{d}</th>)}
+                            </tr>
+                        </thead>
                         <tbody>
                             {traders.map(trader => (
                                 <tr key={trader} className="border-t border-zinc-800">
-                                    <td className="p-4 font-medium">{trader}</td>
-                                    {['D0', 'D1', 'D2', 'D3'].map(day => {
+                                    <td className="p-4 font-bold text-sm">{trader}</td>
+                                    {days.map(day => {
                                         const run = data.find(d => d.trader === trader && d.day === day);
                                         const pnl = run?.final_pnl || 0;
-                                        return <td key={day} className="p-2"><div className={`h-10 rounded flex items-center justify-center text-xs font-bold ${pnl > 0 ? 'bg-emerald-500/20 text-emerald-400' : pnl < 0 ? 'bg-rose-500/20 text-rose-400' : 'bg-zinc-800 text-zinc-500'}`}>{pnl ? `${(pnl / 1000).toFixed(1)}k` : '-'}</div></td>;
+                                        const opacity = Math.min(Math.abs(pnl) / 10000 + 0.1, 1);
+                                        return (
+                                            <td key={day} className="p-2">
+                                                <div className={`h-12 rounded-lg flex items-center justify-center text-xs font-bold ${pnl > 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20' : pnl < 0 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/20' : 'bg-zinc-900 text-zinc-600'}`}>
+                                                    {pnl ? `${(pnl / 1000).toFixed(1)}k` : '-'}
+                                                </div>
+                                            </td>
+                                        );
                                     })}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </Card>
+            );
+        };
+
+        const StressLabView = ({ results }) => {
+            if (!results || results.length === 0) return <div className="p-10 text-center text-zinc-500 italic">Run Stress Lab v2 to see results here.</div>;
+            const res = results[0];
+            const chartOptions = {
+                chart: { type: 'bar', background: 'transparent', toolbar: { show: false } },
+                plotOptions: { bar: { borderRadius: 4, distributed: true } },
+                colors: ['#00ff9d', '#00d1ff', '#ff4757', '#ffa502', '#cc44ff'],
+                xaxis: { categories: res.results.map(r => `L${r.latency} S${r.slippage}`), labels: { style: { colors: '#545d6a' } } },
+                yaxis: { labels: { style: { colors: '#545d6a' } } },
+                legend: { show: false },
+                grid: { borderColor: '#1a1e26' }
+            };
+            return (
+                <div className="space-y-6">
+                    <Card title="Stress Sensitivity" subtitle="PnL decay under simulated network latency and execution slippage.">
+                        <div className="h-[400px]"><Chart options={chartOptions} series={[{name: 'PnL', data: res.results.map(r => r.pnl)}]} type="bar" height="100%" /></div>
+                    </Card>
+                </div>
+            );
+        };
+
+        // --- Main App ---
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('OVERLAY');
+            const [filters, setFilters] = useState({ source: 'BACKTEST', round: 'R5', day: 'D2' });
+            const [selectedId, setSelectedId] = useState(null);
+            const [isRefetching, setIsRefetching] = useState(false);
+
+            const allData = useMemo(() => ({
+                backtest: window.BACKTEST_DATA || [],
+                live: window.LIVE_LOG_DATA || [],
+                i4bt: window.I4BT_DATA || [],
+                real: window.REAL_DATA_RESULTS || [],
+                scenario: window.SCENARIO_RESULTS || [],
+                stress: window.STRESS_RESULTS || []
+            }), []);
+
+            const filteredData = useMemo(() => {
+                const source = filters.source.toLowerCase();
+                return (allData[source] || []).filter(d => 
+                    (filters.round === 'TOTAL' || d.round === filters.round) &&
+                    (filters.day === 'TOTAL' || d.day === filters.day)
+                );
+            }, [filters, allData]);
+
+            const handleRefetch = async () => {
+                setIsRefetching(true);
+                try {
+                    const resp = await fetch('/api/load-data');
+                    const data = await resp.json();
+                    if (data.ok) window.location.reload();
+                    else alert('Refetch failed: ' + data.error);
+                } catch (e) {
+                    console.log('API not available, running in standalone mode.');
+                    setIsRefetching(false);
+                }
+            };
+
+            return (
+                <div className="flex h-full">
+                    {/* Sidebar */}
+                    <div className="w-80 glass z-20 flex flex-col p-8 gap-8">
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 bg-[#00ff9d] rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(0,255,157,0.3)]">
+                                    <Icon name="terminal" className="text-black" size={24} />
+                                </div>
+                                <h1 className="text-xl font-black tracking-tighter">PROSPERITY<span className="text-[#00ff9d]">VIZ</span></h1>
+                            </div>
+                            <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest ml-1">Quantum Strategy Dashboard</p>
+                        </div>
+
+                        <div className="space-y-6 overflow-y-auto pr-2">
+                            <section>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-4 block">Source</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {['BACKTEST', 'LIVE', 'I4BT', 'REAL', 'SCENARIO', 'STRESS'].map(s => (
+                                        <button key={s} onClick={() => setFilters({...filters, source: s})} className={`py-2 px-3 rounded-xl text-[10px] font-black transition-all border ${filters.source === s ? 'bg-[#00ff9d] border-[#00ff9d] text-black shadow-[0_0_15px_rgba(0,255,157,0.2)]' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>{s}</button>
+                                    ))}
+                                </div>
+                            </section>
+
+                            <section>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-4 block">Round & Context</label>
+                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                    {['R3', 'R4', 'R5', 'TOTAL'].map(r => (
+                                        <button key={r} onClick={() => setFilters({...filters, round: r})} className={`py-2 rounded-xl text-[10px] font-black border ${filters.round === r ? 'border-[#00ff9d] text-[#00ff9d]' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>{r}</button>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {['D0', 'D1', 'D2', 'D3', 'TOTAL'].map(d => (
+                                        <button key={d} onClick={() => setFilters({...filters, day: d})} className={`py-2 rounded-xl text-[10px] font-black border ${filters.day === d ? 'border-[#00ff9d] text-[#00ff9d]' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>{d}</button>
+                                    ))}
+                                </div>
+                            </section>
+
+                            <section>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-4 block">Actions</label>
+                                <button onClick={handleRefetch} disabled={isRefetching} className="w-full flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold transition-all border border-white/5">
+                                    <Icon name="refresh-ccw" size={14} className={isRefetching ? 'animate-spin' : ''} />
+                                    {isRefetching ? 'REFETCHING...' : 'REFETCH DATA'}
+                                </button>
+                            </section>
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex-1 flex flex-col min-w-0">
+                        <header className="h-20 border-b border-zinc-900 flex items-center justify-between px-10">
+                            <nav className="flex gap-10 h-full">
+                                {['OVERLAY', 'COMPARE', 'ATTRIBUTION', 'STABILITY', 'STRESS LAB'].map(tab => (
+                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`text-[11px] font-black uppercase tracking-[0.2em] relative h-full transition-all ${activeTab === tab ? 'text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
+                                        {tab}
+                                        {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#00ff9d] shadow-[0_0_15px_rgba(0,255,157,0.5)]" />}
+                                    </button>
+                                ))}
+                            </nav>
+                            <div className="flex items-center gap-4">
+                                <div className="flex flex-col items-end">
+                                    <span className="text-[10px] font-black text-[#00ff9d] accent-glow">ACTIVE NODE</span>
+                                    <span className="text-xs font-bold opacity-40">TRADER-ADIN-V3.PY</span>
+                                </div>
+                                <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                </div>
+                            </div>
+                        </header>
+
+                        <main className="flex-1 overflow-y-auto p-10 space-y-10">
+                            {activeTab === 'OVERLAY' && <OverlayView data={filteredData} selectedId={selectedId} onSelect={setSelectedId} />}
+                            {activeTab === 'STABILITY' && <StabilityView data={allData.backtest} />}
+                            {activeTab === 'STRESS LAB' && <StressLabView results={allData.stress} />}
+                            {(activeTab === 'COMPARE' || activeTab === 'ATTRIBUTION') && <div className="p-20 text-center glass rounded-3xl text-zinc-600 border-dashed">Module expansion in progress...</div>}
+                        </main>
+                    </div>
+                </div>
             );
         };
 
