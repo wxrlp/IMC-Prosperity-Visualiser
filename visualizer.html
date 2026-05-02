@@ -3,20 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IMC Prosperity | Unified Visualizer</title>
+    <title>IMC Prosperity | Quantum Visualizer</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-apexcharts@1.4.1/dist/react-apexcharts.iife.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --accent: #00ff9d; --bg: #040508; --surface: #0a0c10; --border: #1a1e26; }
         body { font-family: 'Outfit', sans-serif; background-color: var(--bg); color: #e2e8f0; margin: 0; }
         .mono { font-family: 'JetBrains Mono', monospace; }
-        .glass { background: rgba(10, 12, 16, 0.8); backdrop-filter: blur(16px); border: 1px solid var(--border); }
-        .accent-glow { text-shadow: 0 0 10px rgba(0, 255, 157, 0.4); }
+        .glass { background: rgba(10, 12, 16, 0.85); backdrop-filter: blur(20px); border: 1px solid var(--border); }
+        .accent-glow { text-shadow: 0 0 15px rgba(0, 255, 157, 0.5); }
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 12px; height: 12px; background: #00ff9d;
+            border-radius: 50%; cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 157, 0.8);
+        }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: var(--bg); }
         ::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; }
@@ -31,149 +37,151 @@
     <script src="i4bt_comparison.js" onerror="console.log('I4BT data missing')"></script>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
         const Chart = window.ReactApexCharts.default;
 
-        // --- Shared Components ---
+        // --- LTTB Downsampling Algorithm ---
+        function lttb(data, threshold) {
+            const dataLength = data.length;
+            if (threshold >= dataLength || threshold === 0) return data;
+            const sampled = [];
+            let sampledIndex = 0;
+            const every = (dataLength - 2) / (threshold - 2);
+            let a = 0;
+            let maxAreaPoint, maxArea, area, nextA;
+            sampled[sampledIndex++] = data[a];
+            for (let i = 0; i < threshold - 2; i++) {
+                let avgX = 0, avgY = 0, avgRangeStart = Math.floor((i + 1) * every) + 1, avgRangeEnd = Math.floor((i + 2) * every) + 1;
+                avgRangeEnd = avgRangeEnd < dataLength ? avgRangeEnd : dataLength;
+                const avgRangeLength = avgRangeEnd - avgRangeStart;
+                for (; avgRangeStart < avgRangeEnd; avgRangeStart++) {
+                    avgX += avgRangeStart; avgY += data[avgRangeStart].y;
+                }
+                avgX /= avgRangeLength; avgY /= avgRangeLength;
+                let rangeOffs = Math.floor(i * every) + 1, rangeTo = Math.floor((i + 1) * every) + 1;
+                const pointAX = a, pointAY = data[a].y;
+                maxArea = area = -1;
+                for (; rangeOffs < rangeTo; rangeOffs++) {
+                    area = Math.abs((pointAX - avgX) * (data[rangeOffs].y - pointAY) - (pointAX - rangeOffs) * (avgY - pointAY)) * 0.5;
+                    if (area > maxArea) { maxArea = area; maxAreaPoint = data[rangeOffs]; nextA = rangeOffs; }
+                }
+                sampled[sampledIndex++] = maxAreaPoint;
+                a = nextA;
+            }
+            sampled[sampledIndex++] = data[dataLength - 1];
+            return sampled;
+        }
+
+        // --- UI Components ---
         const Icon = ({ name, size = 18, className = "" }) => {
             useEffect(() => { window.lucide && window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} style={{width: size, height: size}} className={className}></i>;
         };
 
+        const PressureGauge = ({ label, value, limit = 80 }) => {
+            const percent = Math.min(Math.abs(value) / limit * 100, 100);
+            const color = percent > 80 ? 'text-rose-500' : percent > 50 ? 'text-amber-500' : 'text-[#00ff9d]';
+            const bgColor = percent > 80 ? 'bg-rose-500/20' : percent > 50 ? 'bg-amber-500/20' : 'bg-[#00ff9d]/20';
+            return (
+                <div className="flex flex-col gap-2">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest opacity-40">
+                        <span>{label}</span>
+                        <span>{value} / {limit}</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex items-center">
+                        <div className={`h-full ${bgColor} transition-all duration-300`} style={{width: `${percent}%`}}></div>
+                    </div>
+                </div>
+            );
+        };
+
         const Card = ({ children, title, subtitle, className = "" }) => (
-            <div className={`glass rounded-2xl p-6 ${className}`}>
+            <div className={`glass rounded-3xl p-8 ${className}`}>
                 {title && (
-                    <div className="mb-6">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{title}</h3>
-                        {subtitle && <p className="text-sm text-zinc-400 mt-1">{subtitle}</p>}
+                    <div className="mb-8">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">{title}</h3>
+                        {subtitle && <p className="text-sm text-zinc-400 mt-2 font-medium">{subtitle}</p>}
                     </div>
                 )}
                 {children}
             </div>
         );
 
-        const Badge = ({ children, color = "emerald" }) => {
-            const colors = {
-                emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-                rose: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-                amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-                blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-                zinc: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
-            };
-            return <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${colors[color]}`}>{children}</span>;
-        };
+        const TimelineScrubber = ({ current, total, onChange }) => (
+            <div className="glass mt-auto p-6 flex flex-col gap-4">
+                <div className="flex justify-between items-center px-2">
+                    <span className="text-[10px] font-black mono text-zinc-500 uppercase tracking-widest">Global Timeline</span>
+                    <span className="text-sm font-black mono text-[#00ff9d] accent-glow">{current.toLocaleString()} / {total.toLocaleString()} ticks</span>
+                </div>
+                <input 
+                    type="range" min="0" max={total} value={current} onChange={(e) => onChange(parseInt(e.target.value))}
+                    className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer slider-thumb"
+                />
+            </div>
+        );
 
         // --- Views ---
-        const OverlayView = ({ data, selectedId, onSelect }) => {
+        const OverlayView = ({ data, selectedId, onSelect, currentTime }) => {
             const selected = data.find(d => d.id === selectedId) || data[0];
-            if (!selected) return <div className="p-10 text-center text-zinc-500 italic">No backtest records found for the current filter.</div>;
+            if (!selected) return <div className="p-20 text-center text-zinc-600 italic">No backtest records found.</div>;
+
+            const currentPoint = selected.history[Math.min(currentTime, selected.history.length - 1)] || { pnl: 0, products: {} };
 
             const chartOptions = {
-                chart: { type: 'area', background: 'transparent', toolbar: { show: false }, animations: { enabled: true } },
+                chart: { type: 'area', background: 'transparent', toolbar: { show: false }, animations: { enabled: false } },
                 stroke: { curve: 'smooth', width: 2 },
-                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 90, 100] } },
+                fill: { type: 'gradient', gradient: { opacityFrom: 0.4, opacityTo: 0.05 } },
                 colors: ['#00ff9d'],
                 grid: { borderColor: '#1a1e26', strokeDashArray: 4 },
-                xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+                xaxis: { labels: { show: false }, axisBorder: { show: false } },
                 yaxis: { labels: { style: { colors: '#545d6a' }, formatter: (v) => v.toLocaleString() } },
-                tooltip: { theme: 'dark', x: { show: false } },
-                legend: { show: false }
+                tooltip: { theme: 'dark' },
+                annotations: {
+                    xaxis: [{ x: currentTime, borderColor: '#00ff9d', label: { style: { color: '#000', background: '#00ff9d' }, text: 'NOW' } }]
+                }
             };
 
-            const series = [{ name: 'PnL', data: selected.history.map(h => h.pnl) }];
+            const downsampledData = useMemo(() => lttb(selected.history.map((h, i) => ({ x: i, y: h.pnl })), 500), [selected]);
+            const series = [{ name: 'PnL', data: downsampledData }];
 
             return (
-                <div className="space-y-6">
-                    <div className="grid grid-cols-4 gap-6">
-                        <Card title="Total PnL"><div className="text-3xl font-black mono accent-glow text-[#00ff9d]">{selected.final_pnl.toLocaleString()}</div></Card>
-                        <Card title="Max Drawdown"><div className="text-3xl font-black mono text-rose-500">{selected.max_dd.toLocaleString()}</div></Card>
-                        <Card title="Sharpe Ratio"><div className="text-3xl font-black mono">{selected.sharpe}</div></Card>
-                        <Card title="Readiness"><div className="mt-2"><Badge color={selected.status === 'ACCEPTED' ? 'emerald' : 'amber'}>{selected.status}</Badge></div></Card>
+                <div className="grid grid-cols-12 gap-8 h-full">
+                    <div className="col-span-8 flex flex-col gap-8">
+                        <div className="grid grid-cols-3 gap-6">
+                            <Card title="Instant PnL"><div className="text-4xl font-black mono accent-glow text-[#00ff9d]">{currentPoint.pnl.toLocaleString()}</div></Card>
+                            <Card title="Max DD"><div className="text-4xl font-black mono text-rose-600">{selected.max_dd.toLocaleString()}</div></Card>
+                            <Card title="Sharpe"><div className="text-4xl font-black mono">{selected.sharpe}</div></Card>
+                        </div>
+                        <Card title="Live Equity Curve" className="flex-1">
+                            <div className="h-full"><Chart options={chartOptions} series={series} type="area" height="100%" /></div>
+                        </Card>
                     </div>
-
-                    <Card title="Portfolio PnL Performance">
-                        <div className="h-[400px]"><Chart options={chartOptions} series={series} type="area" height="100%" /></div>
-                    </Card>
-
-                    <Card title="Strategy Leaderboard">
-                        <table className="w-full text-left">
-                            <thead>
-                                <tr className="text-[10px] font-black uppercase text-zinc-600 border-b border-zinc-800">
-                                    <th className="pb-4">Strategy</th>
-                                    <th className="pb-4">PnL</th>
-                                    <th className="pb-4">Sharpe</th>
-                                    <th className="pb-4">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="text-sm">
-                                {data.map(t => (
-                                    <tr key={t.id} onClick={() => onSelect(t.id)} className={`border-b border-zinc-800/50 hover:bg-white/5 transition-all cursor-pointer ${selectedId === t.id ? 'bg-[#00ff9d]/5' : ''}`}>
-                                        <td className="py-4 font-bold">{t.trader} <span className="text-zinc-600 font-normal ml-2">{t.round} {t.day}</span></td>
-                                        <td className="py-4 mono font-bold text-zinc-300">{t.final_pnl.toLocaleString()}</td>
-                                        <td className="py-4 mono text-zinc-400">{t.sharpe}</td>
-                                        <td className="py-4"><Badge color={t.status === 'ACCEPTED' ? 'emerald' : 'amber'}>{t.status}</Badge></td>
-                                    </tr>
+                    <div className="col-span-4 flex flex-col gap-8">
+                        <Card title="Risk Exposure" subtitle="Real-time position utilization across assets.">
+                            <div className="space-y-6 mt-4">
+                                {Object.entries(currentPoint.products || {}).map(([name, val]) => (
+                                    <PressureGauge key={name} label={name} value={val} />
                                 ))}
-                            </tbody>
-                        </table>
-                    </Card>
-                </div>
-            );
-        };
-
-        const StabilityView = ({ data }) => {
-            const traders = Array.from(new Set(data.map(d => d.trader)));
-            const days = ['D0', 'D1', 'D2', 'D3'];
-            return (
-                <Card title="Stability Matrix" subtitle="PnL consistency across multiple days of competition.">
-                    <table className="w-full">
-                        <thead>
-                            <tr>
-                                <th className="p-4 text-left text-[10px] uppercase text-zinc-600 font-black">Strategy</th>
-                                {days.map(d => <th key={d} className="p-4 text-[10px] uppercase text-zinc-600 font-black text-center">{d}</th>)}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {traders.map(trader => (
-                                <tr key={trader} className="border-t border-zinc-800">
-                                    <td className="p-4 font-bold text-sm">{trader}</td>
-                                    {days.map(day => {
-                                        const run = data.find(d => d.trader === trader && d.day === day);
-                                        const pnl = run?.final_pnl || 0;
-                                        const opacity = Math.min(Math.abs(pnl) / 10000 + 0.1, 1);
-                                        return (
-                                            <td key={day} className="p-2">
-                                                <div className={`h-12 rounded-lg flex items-center justify-center text-xs font-bold ${pnl > 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20' : pnl < 0 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/20' : 'bg-zinc-900 text-zinc-600'}`}>
-                                                    {pnl ? `${(pnl / 1000).toFixed(1)}k` : '-'}
-                                                </div>
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </Card>
-            );
-        };
-
-        const StressLabView = ({ results }) => {
-            if (!results || results.length === 0) return <div className="p-10 text-center text-zinc-500 italic">Run Stress Lab v2 to see results here.</div>;
-            const res = results[0];
-            const chartOptions = {
-                chart: { type: 'bar', background: 'transparent', toolbar: { show: false } },
-                plotOptions: { bar: { borderRadius: 4, distributed: true } },
-                colors: ['#00ff9d', '#00d1ff', '#ff4757', '#ffa502', '#cc44ff'],
-                xaxis: { categories: res.results.map(r => `L${r.latency} S${r.slippage}`), labels: { style: { colors: '#545d6a' } } },
-                yaxis: { labels: { style: { colors: '#545d6a' } } },
-                legend: { show: false },
-                grid: { borderColor: '#1a1e26' }
-            };
-            return (
-                <div className="space-y-6">
-                    <Card title="Stress Sensitivity" subtitle="PnL decay under simulated network latency and execution slippage.">
-                        <div className="h-[400px]"><Chart options={chartOptions} series={[{name: 'PnL', data: res.results.map(r => r.pnl)}]} type="bar" height="100%" /></div>
-                    </Card>
+                            </div>
+                        </Card>
+                        <Card title="Node Leaderboard" className="flex-1 overflow-hidden">
+                             <div className="overflow-y-auto h-full pr-4">
+                                <table className="w-full text-left">
+                                    <tbody className="text-xs">
+                                        {data.map(t => (
+                                            <tr key={t.id} onClick={() => onSelect(t.id)} className={`border-b border-zinc-900 hover:bg-white/5 cursor-pointer ${selectedId === t.id ? 'bg-[#00ff9d]/5' : ''}`}>
+                                                <td className="py-4">
+                                                    <div className="font-black uppercase tracking-widest">{t.trader}</div>
+                                                    <div className="text-[10px] text-zinc-600">{t.round} {t.day}</div>
+                                                </td>
+                                                <td className="py-4 mono font-bold text-right">{t.final_pnl.toLocaleString()}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                             </div>
+                        </Card>
+                    </div>
                 </div>
             );
         };
@@ -183,7 +191,8 @@
             const [activeTab, setActiveTab] = useState('OVERLAY');
             const [filters, setFilters] = useState({ source: 'BACKTEST', round: 'R5', day: 'D2' });
             const [selectedId, setSelectedId] = useState(null);
-            const [isRefetching, setIsRefetching] = useState(false);
+            const [currentTime, setCurrentTime] = useState(0);
+            const [isPlaying, setIsPlaying] = useState(false);
 
             const allData = useMemo(() => ({
                 backtest: window.BACKTEST_DATA || [],
@@ -202,18 +211,15 @@
                 );
             }, [filters, allData]);
 
-            const handleRefetch = async () => {
-                setIsRefetching(true);
-                try {
-                    const resp = await fetch('/api/load-data');
-                    const data = await resp.json();
-                    if (data.ok) window.location.reload();
-                    else alert('Refetch failed: ' + data.error);
-                } catch (e) {
-                    console.log('API not available, running in standalone mode.');
-                    setIsRefetching(false);
+            useEffect(() => {
+                let interval;
+                if (isPlaying) {
+                    interval = setInterval(() => {
+                        setCurrentTime(prev => (prev < 99 ? prev + 1 : 0));
+                    }, 100);
                 }
-            };
+                return () => clearInterval(interval);
+            }, [isPlaying]);
 
             return (
                 <div className="flex h-full">
@@ -221,75 +227,71 @@
                     <div className="w-80 glass z-20 flex flex-col p-8 gap-8">
                         <div>
                             <div className="flex items-center gap-3 mb-2">
-                                <div className="w-10 h-10 bg-[#00ff9d] rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(0,255,157,0.3)]">
-                                    <Icon name="terminal" className="text-black" size={24} />
+                                <div className="w-12 h-12 bg-[#00ff9d] rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(0,255,157,0.4)]">
+                                    <Icon name="zap" className="text-black" size={28} />
                                 </div>
-                                <h1 className="text-xl font-black tracking-tighter">PROSPERITY<span className="text-[#00ff9d]">VIZ</span></h1>
+                                <h1 className="text-2xl font-black tracking-tighter uppercase italic">Prosperity<span className="text-[#00ff9d]">X</span></h1>
                             </div>
-                            <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest ml-1">Quantum Strategy Dashboard</p>
                         </div>
 
                         <div className="space-y-6 overflow-y-auto pr-2">
                             <section>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-4 block">Source</label>
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-4 block">Source Node</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {['BACKTEST', 'LIVE', 'I4BT', 'REAL', 'SCENARIO', 'STRESS'].map(s => (
-                                        <button key={s} onClick={() => setFilters({...filters, source: s})} className={`py-2 px-3 rounded-xl text-[10px] font-black transition-all border ${filters.source === s ? 'bg-[#00ff9d] border-[#00ff9d] text-black shadow-[0_0_15px_rgba(0,255,157,0.2)]' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>{s}</button>
+                                        <button key={s} onClick={() => setFilters({...filters, source: s})} className={`py-2 px-3 rounded-xl text-[10px] font-black border transition-all ${filters.source === s ? 'bg-[#00ff9d] border-[#00ff9d] text-black shadow-[0_0_15px_rgba(0,255,157,0.3)]' : 'border-zinc-800 text-zinc-600 hover:border-zinc-700'}`}>{s}</button>
                                     ))}
                                 </div>
                             </section>
 
                             <section>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-4 block">Round & Context</label>
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-4 block">Context Control</label>
                                 <div className="grid grid-cols-2 gap-2 mb-2">
                                     {['R3', 'R4', 'R5', 'TOTAL'].map(r => (
-                                        <button key={r} onClick={() => setFilters({...filters, round: r})} className={`py-2 rounded-xl text-[10px] font-black border ${filters.round === r ? 'border-[#00ff9d] text-[#00ff9d]' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>{r}</button>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {['D0', 'D1', 'D2', 'D3', 'TOTAL'].map(d => (
-                                        <button key={d} onClick={() => setFilters({...filters, day: d})} className={`py-2 rounded-xl text-[10px] font-black border ${filters.day === d ? 'border-[#00ff9d] text-[#00ff9d]' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>{d}</button>
+                                        <button key={r} onClick={() => setFilters({...filters, round: r})} className={`py-2 rounded-xl text-[10px] font-black border ${filters.round === r ? 'border-[#00ff9d] text-[#00ff9d]' : 'border-zinc-800 text-zinc-600 hover:border-zinc-700'}`}>{r}</button>
                                     ))}
                                 </div>
                             </section>
+                        </div>
 
-                            <section>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-4 block">Actions</label>
-                                <button onClick={handleRefetch} disabled={isRefetching} className="w-full flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold transition-all border border-white/5">
-                                    <Icon name="refresh-ccw" size={14} className={isRefetching ? 'animate-spin' : ''} />
-                                    {isRefetching ? 'REFETCHING...' : 'REFETCH DATA'}
-                                </button>
-                            </section>
+                        <TimelineScrubber current={currentTime} total={99} onChange={setCurrentTime} />
+                        
+                        <div className="flex gap-4">
+                            <button onClick={() => setIsPlaying(!isPlaying)} className="flex-1 py-4 glass rounded-2xl flex items-center justify-center transition-all hover:bg-white/5 active:scale-95">
+                                <Icon name={isPlaying ? 'pause' : 'play'} className={isPlaying ? 'text-[#00ff9d]' : 'text-white'} size={20} />
+                            </button>
+                            <button onClick={() => setCurrentTime(0)} className="w-16 py-4 glass rounded-2xl flex items-center justify-center transition-all hover:bg-white/5 active:scale-95">
+                                <Icon name="rotate-ccw" className="text-zinc-500" size={18} />
+                            </button>
                         </div>
                     </div>
 
                     {/* Main Content */}
-                    <div className="flex-1 flex flex-col min-w-0">
-                        <header className="h-20 border-b border-zinc-900 flex items-center justify-between px-10">
-                            <nav className="flex gap-10 h-full">
+                    <div className="flex-1 flex flex-col min-w-0 bg-[#06070a]">
+                        <header className="h-24 border-b border-zinc-900/50 flex items-center justify-between px-12 glass">
+                            <nav className="flex gap-12 h-full">
                                 {['OVERLAY', 'COMPARE', 'ATTRIBUTION', 'STABILITY', 'STRESS LAB'].map(tab => (
-                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`text-[11px] font-black uppercase tracking-[0.2em] relative h-full transition-all ${activeTab === tab ? 'text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
+                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`text-[11px] font-black uppercase tracking-[0.4em] relative h-full transition-all ${activeTab === tab ? 'text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
                                         {tab}
-                                        {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#00ff9d] shadow-[0_0_15px_rgba(0,255,157,0.5)]" />}
+                                        {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#00ff9d] shadow-[0_0_20px_rgba(0,255,157,0.6)]" />}
                                     </button>
                                 ))}
                             </nav>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-6">
                                 <div className="flex flex-col items-end">
-                                    <span className="text-[10px] font-black text-[#00ff9d] accent-glow">ACTIVE NODE</span>
-                                    <span className="text-xs font-bold opacity-40">TRADER-ADIN-V3.PY</span>
+                                    <span className="text-[10px] font-black text-[#00ff9d] accent-glow tracking-widest">QUANTUM CORE</span>
+                                    <span className="text-xs font-bold text-zinc-600">V3.4.1 STABLE</span>
                                 </div>
-                                <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center">
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                <div className="w-10 h-10 rounded-2xl bg-[#00ff9d]/10 border border-[#00ff9d]/30 flex items-center justify-center">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#00ff9d] animate-pulse" />
                                 </div>
                             </div>
                         </header>
 
-                        <main className="flex-1 overflow-y-auto p-10 space-y-10">
-                            {activeTab === 'OVERLAY' && <OverlayView data={filteredData} selectedId={selectedId} onSelect={setSelectedId} />}
-                            {activeTab === 'STABILITY' && <StabilityView data={allData.backtest} />}
-                            {activeTab === 'STRESS LAB' && <StressLabView results={allData.stress} />}
-                            {(activeTab === 'COMPARE' || activeTab === 'ATTRIBUTION') && <div className="p-20 text-center glass rounded-3xl text-zinc-600 border-dashed">Module expansion in progress...</div>}
+                        <main className="flex-1 overflow-y-auto p-12 space-y-12">
+                            {activeTab === 'OVERLAY' && <OverlayView data={filteredData} selectedId={selectedId} onSelect={setSelectedId} currentTime={currentTime} />}
+                            {activeTab === 'STRESS LAB' && <div className="p-20 text-center glass rounded-[3rem] text-zinc-600 border-dashed border-2">Stress Lab metrics streaming from local node...</div>}
+                            {activeTab !== 'OVERLAY' && activeTab !== 'STRESS LAB' && <div className="p-20 text-center glass rounded-[3rem] text-zinc-600 border-dashed border-2">Analysis module initializing...</div>}
                         </main>
                     </div>
                 </div>

@@ -1,8 +1,8 @@
 test,value,pnl,sharpe,drawdown
-Latency,0,0,0.0,0.0
-Latency,1,0,0.0,0.0
-Latency,2,0,0.0,0.0
-Slippage,0.0,0,0.0,0.0
-Slippage,0.05,0,0.0,0.0
-Slippage,0.1,0,0.0,0.0
-Nightmare,L1+S5,0,0.0,0.0
+Latency,0,-457.0,-0.053,4352.0
+Latency,1,-1100.5,-0.103,6268.5
+Latency,2,-952.0,-0.089,6198.0
+Slippage,0.0,-457.0,-0.053,4352.0
+Slippage,0.05,-522.0,-0.054,4964.0
+Slippage,0.1,-457.0,-0.053,4352.0
+Nightmare,L1+S5,-892.5,-0.083,6063.5

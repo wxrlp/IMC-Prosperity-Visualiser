@@ -27,7 +27,12 @@ class AdvancedMatchingEngine:
     def __init__(self, latency_ticks: int = 0, slippage_prob: float = 0.0):
         self.latency_ticks = latency_ticks
         self.slippage_prob = slippage_prob
-        self.limits = {"ASH_COATED_OSMIUM": 80, "INTARIAN_PEPPER_ROOT": 80}
+        self.limits = {
+            "ASH_COATED_OSMIUM": 80, 
+            "INTARIAN_PEPPER_ROOT": 80,
+            "HYDROGEL_PACK": 80,
+            "VELVETFRUIT_EXTRACT": 80
+        }
         
     def run_backtest(self, trader_file: str, data_file: str) -> BacktestResult:
         # Load trader
