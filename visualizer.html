@@ -19,9 +19,9 @@
         .accent-glow { text-shadow: 0 0 15px rgba(0, 255, 157, 0.5); }
         .slider-thumb::-webkit-slider-thumb {
             -webkit-appearance: none; appearance: none;
-            width: 12px; height: 12px; background: #00ff9d;
+            width: 14px; height: 14px; background: #00ff9d;
             border-radius: 50%; cursor: pointer;
-            box-shadow: 0 0 10px rgba(0, 255, 157, 0.8);
+            box-shadow: 0 0 15px rgba(0, 255, 157, 0.8);
         }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: var(--bg); }
@@ -80,26 +80,26 @@
 
         const PressureGauge = ({ label, value, limit = 80 }) => {
             const percent = Math.min(Math.abs(value) / limit * 100, 100);
-            const color = percent > 80 ? 'text-rose-500' : percent > 50 ? 'text-amber-500' : 'text-[#00ff9d]';
-            const bgColor = percent > 80 ? 'bg-rose-500/20' : percent > 50 ? 'bg-amber-500/20' : 'bg-[#00ff9d]/20';
+            const colorClass = percent > 90 ? 'bg-rose-500' : percent > 70 ? 'bg-amber-500' : 'bg-[#00ff9d]';
+            const shadowClass = percent > 90 ? 'shadow-[0_0_10px_#ef4444]' : percent > 70 ? 'shadow-[0_0_10px_#f59e0b]' : 'shadow-[0_0_10px_#00ff9d]';
             return (
                 <div className="flex flex-col gap-2">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest opacity-40">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-500">
                         <span>{label}</span>
-                        <span>{value} / {limit}</span>
+                        <span className="mono">{value} / {limit}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex items-center">
-                        <div className={`h-full ${bgColor} transition-all duration-300`} style={{width: `${percent}%`}}></div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                        <div className={`h-full ${colorClass} ${shadowClass} transition-all duration-300`} style={{width: `${percent}%`}}></div>
                     </div>
                 </div>
             );
         };
 
         const Card = ({ children, title, subtitle, className = "" }) => (
-            <div className={`glass rounded-3xl p-8 ${className}`}>
+            <div className={`glass rounded-[2rem] p-8 ${className}`}>
                 {title && (
                     <div className="mb-8">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">{title}</h3>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600">{title}</h3>
                         {subtitle && <p className="text-sm text-zinc-400 mt-2 font-medium">{subtitle}</p>}
                     </div>
                 )}
@@ -107,23 +107,10 @@
             </div>
         );
 
-        const TimelineScrubber = ({ current, total, onChange }) => (
-            <div className="glass mt-auto p-6 flex flex-col gap-4">
-                <div className="flex justify-between items-center px-2">
-                    <span className="text-[10px] font-black mono text-zinc-500 uppercase tracking-widest">Global Timeline</span>
-                    <span className="text-sm font-black mono text-[#00ff9d] accent-glow">{current.toLocaleString()} / {total.toLocaleString()} ticks</span>
-                </div>
-                <input 
-                    type="range" min="0" max={total} value={current} onChange={(e) => onChange(parseInt(e.target.value))}
-                    className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer slider-thumb"
-                />
-            </div>
-        );
-
         // --- Views ---
         const OverlayView = ({ data, selectedId, onSelect, currentTime }) => {
             const selected = data.find(d => d.id === selectedId) || data[0];
-            if (!selected) return <div className="p-20 text-center text-zinc-600 italic">No backtest records found.</div>;
+            if (!selected) return <div className="p-20 text-center text-zinc-600 italic">No records found.</div>;
 
             const currentPoint = selected.history[Math.min(currentTime, selected.history.length - 1)] || { pnl: 0, products: {} };
 
@@ -137,44 +124,43 @@
                 yaxis: { labels: { style: { colors: '#545d6a' }, formatter: (v) => v.toLocaleString() } },
                 tooltip: { theme: 'dark' },
                 annotations: {
-                    xaxis: [{ x: currentTime, borderColor: '#00ff9d', label: { style: { color: '#000', background: '#00ff9d' }, text: 'NOW' } }]
+                    xaxis: [{ x: currentTime, borderColor: '#00ff9d', label: { style: { color: '#000', background: '#00ff9d', fontWeight: '900' }, text: 'T' + currentTime } }]
                 }
             };
 
             const downsampledData = useMemo(() => lttb(selected.history.map((h, i) => ({ x: i, y: h.pnl })), 500), [selected]);
-            const series = [{ name: 'PnL', data: downsampledData }];
-
+            
             return (
                 <div className="grid grid-cols-12 gap-8 h-full">
                     <div className="col-span-8 flex flex-col gap-8">
                         <div className="grid grid-cols-3 gap-6">
-                            <Card title="Instant PnL"><div className="text-4xl font-black mono accent-glow text-[#00ff9d]">{currentPoint.pnl.toLocaleString()}</div></Card>
-                            <Card title="Max DD"><div className="text-4xl font-black mono text-rose-600">{selected.max_dd.toLocaleString()}</div></Card>
-                            <Card title="Sharpe"><div className="text-4xl font-black mono">{selected.sharpe}</div></Card>
+                            <Card title="PnL Snapshot"><div className="text-4xl font-black mono accent-glow text-[#00ff9d]">{currentPoint.pnl.toLocaleString()}</div></Card>
+                            <Card title="Max Drawdown"><div className="text-4xl font-black mono text-rose-500">{selected.max_dd?.toLocaleString() || 0}</div></Card>
+                            <Card title="Sharpe"><div className="text-4xl font-black mono">{selected.sharpe || 0}</div></Card>
                         </div>
-                        <Card title="Live Equity Curve" className="flex-1">
-                            <div className="h-full"><Chart options={chartOptions} series={series} type="area" height="100%" /></div>
+                        <Card title="Equity Trajectory" className="flex-1">
+                            <div className="h-full"><Chart options={chartOptions} series={[{name: 'PnL', data: downsampledData}]} type="area" height="100%" /></div>
                         </Card>
                     </div>
                     <div className="col-span-4 flex flex-col gap-8">
-                        <Card title="Risk Exposure" subtitle="Real-time position utilization across assets.">
+                        <Card title="Product Exposure" subtitle="Real-time position utilization.">
                             <div className="space-y-6 mt-4">
                                 {Object.entries(currentPoint.products || {}).map(([name, val]) => (
                                     <PressureGauge key={name} label={name} value={val} />
                                 ))}
                             </div>
                         </Card>
-                        <Card title="Node Leaderboard" className="flex-1 overflow-hidden">
-                             <div className="overflow-y-auto h-full pr-4">
+                        <Card title="Strategy Hub" className="flex-1 overflow-hidden">
+                             <div className="overflow-y-auto h-full pr-4 custom-scroll">
                                 <table className="w-full text-left">
                                     <tbody className="text-xs">
                                         {data.map(t => (
-                                            <tr key={t.id} onClick={() => onSelect(t.id)} className={`border-b border-zinc-900 hover:bg-white/5 cursor-pointer ${selectedId === t.id ? 'bg-[#00ff9d]/5' : ''}`}>
-                                                <td className="py-4">
-                                                    <div className="font-black uppercase tracking-widest">{t.trader}</div>
-                                                    <div className="text-[10px] text-zinc-600">{t.round} {t.day}</div>
+                                            <tr key={t.id} onClick={() => onSelect(t.id)} className={`border-b border-zinc-900 hover:bg-white/5 cursor-pointer ${selectedId === t.id ? 'bg-[#00ff9d]/10' : ''}`}>
+                                                <td className="py-5 px-2">
+                                                    <div className="font-black uppercase tracking-widest text-zinc-200">{t.trader}</div>
+                                                    <div className="text-[10px] text-zinc-600 font-bold">{t.round} {t.day}</div>
                                                 </td>
-                                                <td className="py-4 mono font-bold text-right">{t.final_pnl.toLocaleString()}</td>
+                                                <td className="py-5 px-2 mono font-black text-right text-[#00ff9d]">{t.final_pnl.toLocaleString()}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -186,11 +172,99 @@
             );
         };
 
+        const CompareView = ({ data, baselineId, setBaselineId, candidateId, setCandidateId }) => {
+            const baseline = data.find(d => d.id === baselineId) || data[0];
+            const candidate = data.find(d => d.id === candidateId) || data[1] || data[0];
+
+            const chartOptions = {
+                chart: { type: 'line', background: 'transparent', toolbar: { show: false } },
+                stroke: { curve: 'smooth', width: [2, 2, 3] },
+                colors: ['#545d6a', '#00ff9d', '#ff00ff'],
+                grid: { borderColor: '#1a1e26', strokeDashArray: 4 },
+                xaxis: { labels: { show: false } },
+                yaxis: { labels: { style: { colors: '#545d6a' } } },
+                legend: { position: 'top', horizontalAlign: 'right', labels: { colors: '#e2e8f0' } }
+            };
+
+            const alphaData = baseline.history.map((h, i) => ({
+                x: i,
+                y: (candidate.history[i]?.pnl || 0) - h.pnl
+            }));
+
+            const series = [
+                { name: `Baseline: ${baseline.trader}`, data: lttb(baseline.history.map((h, i) => ({ x: i, y: h.pnl })), 200) },
+                { name: `Candidate: ${candidate.trader}`, data: lttb(candidate.history.map((h, i) => ({ x: i, y: h.pnl })), 200) },
+                { name: 'Alpha (Diff)', data: lttb(alphaData, 200) }
+            ];
+
+            return (
+                <div className="space-y-8 h-full flex flex-col">
+                    <div className="grid grid-cols-2 gap-8">
+                        <Card title="Select Baseline">
+                            <select value={baselineId} onChange={e => setBaselineId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm font-bold text-zinc-300 outline-none">
+                                {data.map(d => <option key={d.id} value={d.id}>{d.trader} ({d.round} {d.day})</option>)}
+                            </select>
+                        </Card>
+                        <Card title="Select Candidate">
+                            <select value={candidateId} onChange={e => setCandidateId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm font-bold text-zinc-300 outline-none">
+                                {data.map(d => <option key={d.id} value={d.id}>{d.trader} ({d.round} {d.day})</option>)}
+                            </select>
+                        </Card>
+                    </div>
+                    <Card title="Alpha Analysis" className="flex-1">
+                        <div className="h-full"><Chart options={chartOptions} series={series} type="line" height="100%" /></div>
+                    </Card>
+                </div>
+            );
+        };
+
+        const AttributionView = ({ selectedData }) => {
+            if (!selectedData) return <div className="p-20 text-center text-zinc-600">Select a strategy to see attribution.</div>;
+            const pnlData = selectedData.final_pnl_by_product || {};
+            const products = Object.keys(pnlData);
+            const values = Object.values(pnlData);
+
+            const chartOptions = {
+                chart: { type: 'bar', background: 'transparent', toolbar: { show: false } },
+                plotOptions: { bar: { borderRadius: 8, horizontal: true, distributed: true } },
+                colors: ['#00ff9d', '#00d1ff', '#ff4757', '#ffa502', '#cc44ff'],
+                xaxis: { categories: products, labels: { style: { colors: '#545d6a' } } },
+                yaxis: { labels: { style: { colors: '#545d6a' } } },
+                grid: { borderColor: '#1a1e26' },
+                legend: { show: false }
+            };
+
+            return (
+                <div className="grid grid-cols-2 gap-8 h-full">
+                    <Card title="Product Attribution" subtitle="PnL breakdown by asset.">
+                        <div className="h-[400px]"><Chart options={chartOptions} series={[{name: 'PnL', data: values}]} type="bar" height="100%" /></div>
+                    </Card>
+                    <Card title="Efficiency Metrics">
+                        <div className="space-y-8 mt-10">
+                            {products.map(p => (
+                                <div key={p} className="flex justify-between items-center border-b border-zinc-900 pb-4">
+                                    <div>
+                                        <div className="text-xs font-black uppercase tracking-widest text-zinc-200">{p}</div>
+                                        <div className="text-[10px] text-zinc-600 font-bold">Contribution: {((pnlData[p] / selectedData.final_pnl) * 100).toFixed(1)}%</div>
+                                    </div>
+                                    <div className={`mono font-black ${pnlData[p] >= 0 ? 'text-[#00ff9d]' : 'text-rose-500'}`}>
+                                        {pnlData[p] >= 0 ? '+' : ''}{pnlData[p].toLocaleString()}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+                </div>
+            );
+        };
+
         // --- Main App ---
         const App = () => {
             const [activeTab, setActiveTab] = useState('OVERLAY');
             const [filters, setFilters] = useState({ source: 'BACKTEST', round: 'R5', day: 'D2' });
             const [selectedId, setSelectedId] = useState(null);
+            const [baselineId, setBaselineId] = useState(null);
+            const [candidateId, setCandidateId] = useState(null);
             const [currentTime, setCurrentTime] = useState(0);
             const [isPlaying, setIsPlaying] = useState(false);
 
@@ -216,7 +290,7 @@
                 if (isPlaying) {
                     interval = setInterval(() => {
                         setCurrentTime(prev => (prev < 99 ? prev + 1 : 0));
-                    }, 100);
+                    }, 150);
                 }
                 return () => clearInterval(interval);
             }, [isPlaying]);
@@ -227,41 +301,46 @@
                     <div className="w-80 glass z-20 flex flex-col p-8 gap-8">
                         <div>
                             <div className="flex items-center gap-3 mb-2">
-                                <div className="w-12 h-12 bg-[#00ff9d] rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(0,255,157,0.4)]">
-                                    <Icon name="zap" className="text-black" size={28} />
+                                <div className="w-12 h-12 bg-[#00ff9d] rounded-[1rem] flex items-center justify-center shadow-[0_0_30px_rgba(0,255,157,0.4)]">
+                                    <Icon name="terminal" className="text-black" size={26} />
                                 </div>
                                 <h1 className="text-2xl font-black tracking-tighter uppercase italic">Prosperity<span className="text-[#00ff9d]">X</span></h1>
                             </div>
                         </div>
 
-                        <div className="space-y-6 overflow-y-auto pr-2">
+                        <div className="space-y-6 overflow-y-auto pr-2 custom-scroll">
                             <section>
                                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-4 block">Source Node</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {['BACKTEST', 'LIVE', 'I4BT', 'REAL', 'SCENARIO', 'STRESS'].map(s => (
-                                        <button key={s} onClick={() => setFilters({...filters, source: s})} className={`py-2 px-3 rounded-xl text-[10px] font-black border transition-all ${filters.source === s ? 'bg-[#00ff9d] border-[#00ff9d] text-black shadow-[0_0_15px_rgba(0,255,157,0.3)]' : 'border-zinc-800 text-zinc-600 hover:border-zinc-700'}`}>{s}</button>
+                                        <button key={s} onClick={() => setFilters({...filters, source: s})} className={`py-3 px-3 rounded-2xl text-[10px] font-black border transition-all ${filters.source === s ? 'bg-[#00ff9d] border-[#00ff9d] text-black shadow-[0_0_15px_rgba(0,255,157,0.3)]' : 'border-zinc-800 text-zinc-600 hover:border-zinc-700'}`}>{s}</button>
                                     ))}
                                 </div>
                             </section>
 
                             <section>
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-4 block">Context Control</label>
-                                <div className="grid grid-cols-2 gap-2 mb-2">
-                                    {['R3', 'R4', 'R5', 'TOTAL'].map(r => (
-                                        <button key={r} onClick={() => setFilters({...filters, round: r})} className={`py-2 rounded-xl text-[10px] font-black border ${filters.round === r ? 'border-[#00ff9d] text-[#00ff9d]' : 'border-zinc-800 text-zinc-600 hover:border-zinc-700'}`}>{r}</button>
-                                    ))}
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-4 block">Playback Control</label>
+                                <div className="glass p-5 rounded-2xl space-y-4">
+                                    <div className="flex justify-between text-[10px] font-black mono text-zinc-500 uppercase tracking-widest">
+                                        <span>Tick T</span>
+                                        <span className="text-[#00ff9d]">{currentTime}</span>
+                                    </div>
+                                    <input type="range" min="0" max="99" value={currentTime} onChange={(e) => setCurrentTime(parseInt(e.target.value))} className="w-full h-1 bg-white/5 rounded-full appearance-none cursor-pointer slider-thumb" />
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setIsPlaying(!isPlaying)} className="flex-1 py-3 bg-white/5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-all">
+                                            <Icon name={isPlaying ? 'pause' : 'play'} size={14} className={isPlaying ? 'text-[#00ff9d]' : ''} />
+                                        </button>
+                                        <button onClick={() => setCurrentTime(0)} className="w-12 py-3 bg-white/5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-all">
+                                            <Icon name="rotate-ccw" size={14} className="text-zinc-600" />
+                                        </button>
+                                    </div>
                                 </div>
                             </section>
                         </div>
 
-                        <TimelineScrubber current={currentTime} total={99} onChange={setCurrentTime} />
-                        
-                        <div className="flex gap-4">
-                            <button onClick={() => setIsPlaying(!isPlaying)} className="flex-1 py-4 glass rounded-2xl flex items-center justify-center transition-all hover:bg-white/5 active:scale-95">
-                                <Icon name={isPlaying ? 'pause' : 'play'} className={isPlaying ? 'text-[#00ff9d]' : 'text-white'} size={20} />
-                            </button>
-                            <button onClick={() => setCurrentTime(0)} className="w-16 py-4 glass rounded-2xl flex items-center justify-center transition-all hover:bg-white/5 active:scale-95">
-                                <Icon name="rotate-ccw" className="text-zinc-500" size={18} />
+                        <div className="mt-auto">
+                            <button onClick={() => window.location.reload()} className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-500 text-black rounded-2xl text-xs font-black shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:scale-[1.02] transition-all">
+                                <Icon name="refresh-cw" size={16} /> REFETCH CLOUD DATA
                             </button>
                         </div>
                     </div>
@@ -279,19 +358,21 @@
                             </nav>
                             <div className="flex items-center gap-6">
                                 <div className="flex flex-col items-end">
-                                    <span className="text-[10px] font-black text-[#00ff9d] accent-glow tracking-widest">QUANTUM CORE</span>
-                                    <span className="text-xs font-bold text-zinc-600">V3.4.1 STABLE</span>
+                                    <span className="text-[10px] font-black text-[#00ff9d] accent-glow tracking-widest uppercase">Node Connected</span>
+                                    <span className="text-xs font-bold text-zinc-600">Adin@MacBook-Pro-2</span>
                                 </div>
-                                <div className="w-10 h-10 rounded-2xl bg-[#00ff9d]/10 border border-[#00ff9d]/30 flex items-center justify-center">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-[#00ff9d] animate-pulse" />
+                                <div className="w-10 h-10 rounded-xl bg-[#00ff9d]/10 border border-[#00ff9d]/30 flex items-center justify-center">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#00ff9d] animate-pulse shadow-[0_0_10px_#00ff9d]" />
                                 </div>
                             </div>
                         </header>
 
-                        <main className="flex-1 overflow-y-auto p-12 space-y-12">
+                        <main className="flex-1 overflow-y-auto p-12 custom-scroll">
                             {activeTab === 'OVERLAY' && <OverlayView data={filteredData} selectedId={selectedId} onSelect={setSelectedId} currentTime={currentTime} />}
-                            {activeTab === 'STRESS LAB' && <div className="p-20 text-center glass rounded-[3rem] text-zinc-600 border-dashed border-2">Stress Lab metrics streaming from local node...</div>}
-                            {activeTab !== 'OVERLAY' && activeTab !== 'STRESS LAB' && <div className="p-20 text-center glass rounded-[3rem] text-zinc-600 border-dashed border-2">Analysis module initializing...</div>}
+                            {activeTab === 'COMPARE' && <CompareView data={filteredData} baselineId={baselineId} setBaselineId={setBaselineId} candidateId={candidateId} setCandidateId={setCandidateId} />}
+                            {activeTab === 'ATTRIBUTION' && <AttributionView selectedData={filteredData.find(d => d.id === selectedId) || filteredData[0]} />}
+                            {activeTab === 'STABILITY' && <div className="p-20 text-center glass rounded-[3rem] text-zinc-600 border-dashed border-2">Cross-day stability matrix loading...</div>}
+                            {activeTab === 'STRESS LAB' && <div className="p-20 text-center glass rounded-[3rem] text-zinc-600 border-dashed border-2">Stress simulation streaming from backtest engine...</div>}
                         </main>
                     </div>
                 </div>
