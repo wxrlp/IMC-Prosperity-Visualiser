@@ -18,6 +18,8 @@ Browser-native strategy visualizer for IMC Prosperity. Interactive PnL charts, m
 
 Visit the [live demo](https://wxrlp.github.io/IMC-Prosperity-Visualiser/).
 
+Drag/upload a .log file to analyse any trading algorithms
+
 **Option 2 — Local**
 
 ```bash
@@ -54,4 +56,4 @@ Or use `sample_data.js` as a reference.
 
 ## Tech
 
-Vanilla JS + [ApexCharts](https://apexcharts.com/) + CSS. No framework, no build step, no transpiler.
+Vanilla JS + [ApexCharts](https://apexcharts.com/) + CSS.
