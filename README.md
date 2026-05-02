@@ -4,6 +4,13 @@ A high-performance, aesthetically pleasing visualizer for analyzing and comparin
 
 ![Visualizer Preview](https://img.shields.io/badge/Aesthetics-Premium-blue)
 ![Tech Stack](https://img.shields.io/badge/Tech-React%20%7C%20Tailwind%20%7C%20ApexCharts-emerald)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://adin.github.io/IMC-Prosperity-Visualiser/)
+
+## 🌐 Live Demo
+
+You can view the visualizer live at: **[https://adin.github.io/IMC-Prosperity-Visualiser/](https://adin.github.io/IMC-Prosperity-Visualiser/)**
+
+*(Note: Replace `adin` with your GitHub username if it's different)*
 
 ## Features
 
