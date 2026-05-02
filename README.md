@@ -4,13 +4,24 @@ A high-performance, aesthetically pleasing visualizer for analyzing and comparin
 
 ![Visualizer Preview](https://img.shields.io/badge/Aesthetics-Premium-blue)
 ![Tech Stack](https://img.shields.io/badge/Tech-React%20%7C%20Tailwind%20%7C%20ApexCharts-emerald)
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://adin.github.io/IMC-Prosperity-Visualiser/)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://wxrlp.github.io/IMC-Prosperity-Visualiser/)
 
 ## 🌐 Live Demo
 
-You can view the visualizer live at: **[https://adin.github.io/IMC-Prosperity-Visualiser/](https://adin.github.io/IMC-Prosperity-Visualiser/)**
+You can view the visualizer live at: **[https://wxrlp.github.io/IMC-Prosperity-Visualiser/](https://wxrlp.github.io/IMC-Prosperity-Visualiser/)**
 
-*(Note: Replace `adin` with your GitHub username if it's different)*
+## 🚀 Deployment Instructions
+
+If the GitHub Pages link above is not working yet, follow these exact steps:
+
+1.  **Select Source**: In your GitHub repository, go to **Settings** -> **Pages**.
+2.  **Build and deployment**: Look for the dropdown under **Source**. 
+    *   Make sure it says **Deploy from a branch**.
+3.  **Select Branch**: Under **Branch**, select `main` (or `master`) from the first dropdown.
+4.  **Select Folder**: Ensure the second dropdown says `/(root)`.
+5.  **Save**: Click the **Save** button.
+    *   *Note: If you only see "Custom Domain" or "GitHub Actions", look higher up the page for the "Build and deployment" section.*
+6.  **Refresh**: After saving, wait about 60 seconds and refresh the page. A green bar will appear with the text "Your site is live at...".
 
 ## Features
 
